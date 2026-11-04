@@ -83,7 +83,10 @@ namespace Loreman.Dialogues.Editor
         }
 
         [MenuItem("Tools/Loreman/Settings")]
-        private static void OpenSettings()
+        private static void OpenSettings() => LoremanWindow.Open();
+
+        [MenuItem("Tools/Loreman/Select Settings Asset")]
+        private static void SelectSettingsAsset()
         {
             var settings = LoremanSettings.GetOrCreate();
             Selection.activeObject = settings;

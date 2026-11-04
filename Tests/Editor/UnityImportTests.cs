@@ -37,13 +37,15 @@ namespace Loreman.Dialogues.Tests
 
         private static void Cleanup()
         {
-            var aa = AddressableAssetSettingsDefaultObject.GetSettings(false);
-            if (aa != null)
+            // Only what is inside the test folder: with no folder, FindAssets would look through the whole project.
+            if (AssetDatabase.IsValidFolder(Folder))
             {
-                foreach (var guid in AssetDatabase.FindAssets("t:Object", new[] { Folder }.Where(AssetDatabase.IsValidFolder).ToArray()))
-                    aa.RemoveAssetEntry(guid, false);
+                var aa = AddressableAssetSettingsDefaultObject.GetSettings(false);
+                if (aa != null)
+                    foreach (var guid in AssetDatabase.FindAssets("t:Object", new[] { Folder }))
+                        aa.RemoveAssetEntry(guid, false);
+                AssetDatabase.DeleteAsset(Folder);
             }
-            if (AssetDatabase.IsValidFolder(Folder)) AssetDatabase.DeleteAsset(Folder);
             AssetDatabase.Refresh();
         }
 
@@ -197,6 +199,22 @@ namespace Loreman.Dialogues.Tests
             Assert.IsNull(AssetDatabase.LoadAssetAtPath<DialogueAsset>(_settings.DialoguePath(id)));
             Assert.IsNull(LocalizationEditorSettings.GetStringTableCollection(LoremanNames.DialogueTable(id)));
             Assert.IsEmpty(target.ExistingDialogues());
+        }
+
+        [Test]
+        public void A_dialogue_or_catalog_that_lost_its_addressables_entry_is_registered_again_by_the_next_sync()
+        {
+            Sync();
+            var aa = AddressableAssetSettingsDefaultObject.GetSettings(false);
+            aa.RemoveAssetEntry(AssetDatabase.AssetPathToGUID(_settings.CatalogPath), false);
+            using (var file = SampleBuild.Open())
+                aa.RemoveAssetEntry(AssetDatabase.AssetPathToGUID(_settings.DialoguePath(SampleBuild.Gate(file.Manifest).Guid)), false);
+
+            var report = Sync();
+            Assert.IsFalse(report.WasUpToDate);
+            Assert.AreEqual(1, report.Added); // the dialogue counted as missing
+            Assert.AreEqual(LoremanNames.CatalogAddress, aa.FindAssetEntry(AssetDatabase.AssetPathToGUID(_settings.CatalogPath)).address);
+            Assert.IsTrue(Sync().WasUpToDate);
         }
 
         [Test]

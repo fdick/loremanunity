@@ -34,11 +34,11 @@ camelCase, indented.
 |---|---|
 | `format`, `formatVersion` | `"loreman.build"`, `2` (version 2 added voice-overs and the `audio` fields of the graph). A reader refuses a newer `formatVersion`; adding a part does not raise it. |
 | `projectId`, `projectName`, `builtAt` | where it came from; `builtAt` is **not** part of the hash |
-| `contentHash` | 32 hex digits: the SHA-256 (cut) of the manifest without time and hash, then every part in path order (path, bytes) |
+| `contentHash` | 32 hex digits: the SHA-256 (cut) of the manifest without time and hash, then every part in path order (path, bytes; for a voice-over: path, size, upload time) |
 | `baseLanguage`, `languages[]` | `{code, total, translated, stale}` for the base language and every target language. `stale` = translated from an original that has changed since |
 | `speakers[]` | `{id, color, nameKey, noteKey}`; the speakers who talk in the build, sorted by id. Nodes refer to them by index. `noteKey` 0 = no description |
 | `groups[]` | `{id, name}` of the dialogue groups |
-| `dialogues[]` | `{id, name, groupId?, graph, hash, nodes, texts, audio[]}`; `hash` covers the graph, all its tables and all its voice-overs. `audio[]` is `{id, key, language, path}`: `id` the line or answer, `key` the key id of its voice-over (`audio:{guid}`, the number the graph holds in its `audio` field) |
+| `dialogues[]` | `{id, name, groupId?, graph, hash, nodes, texts, audio[]}`; `hash` covers the graph, all its tables and all its voice-overs (a recording by its path, size and the time it was uploaded: the file is streamed, so the bytes are not read for the hash). `audio[]` is `{id, key, language, path}`: `id` the line or answer, `key` the key id of its voice-over (`audio:{guid}`, the number the graph holds in its `audio` field) |
 
 Language codes are Loreman's (`en`, `pt-br`); the Unity importer turns them into locale codes (`pt-BR`).
 

@@ -34,7 +34,9 @@ namespace Loreman.Dialogues.Editor
             get
             {
                 var catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.CatalogPath);
-                return catalog == null ? string.Empty : catalog.ContentHash ?? string.Empty;
+                // a catalog that is not in Addressables (its entry was removed) is as good as none: the game could not load it
+                if (catalog == null || !IsRegistered(_settings.CatalogPath, LoremanNames.CatalogAddress)) return string.Empty;
+                return catalog.ContentHash ?? string.Empty;
             }
         }
 
@@ -46,11 +48,20 @@ namespace Loreman.Dialogues.Editor
             {
                 var asset = AssetDatabase.LoadAssetAtPath<DialogueAsset>(AssetDatabase.GUIDToAssetPath(guid));
                 if (asset == null || asset.Id == Guid.Empty) continue;
-                // an asset whose texts were deleted is as good as missing: the sync makes both again
+                // an asset whose texts were deleted, or that is not in Addressables any more, is as good as missing: the sync makes it again
                 if (LocalizationEditorSettings.GetStringTableCollection(LoremanNames.DialogueTable(asset.Id)) == null) continue;
+                if (!IsRegistered(AssetDatabase.GUIDToAssetPath(guid), LoremanNames.DialogueAddress(asset.Id))) continue;
                 result[asset.Id] = asset.Hash;
             }
             return result;
+        }
+
+        /// <summary>The asset is an Addressable with this address (the game finds it by the address).</summary>
+        private static bool IsRegistered(string assetPath, string address)
+        {
+            var aa = AddressableAssetSettingsDefaultObject.GetSettings(false);
+            var entry = aa?.FindAssetEntry(AssetDatabase.AssetPathToGUID(assetPath));
+            return entry != null && entry.address == address;
         }
 
         public void Begin()
@@ -68,8 +79,23 @@ namespace Loreman.Dialogues.Editor
 
         // ── locales ──
 
+        /// <summary>
+        /// Unity Localization works only with an active Localization Settings asset (it is what puts the locales and tables into a build and starts the system at run time).
+        /// A project that has none gets one, next to what the importer makes.
+        /// </summary>
+        private void EnsureLocalizationSettings()
+        {
+            if (LocalizationEditorSettings.ActiveLocalizationSettings != null) return;
+            var settings = ScriptableObject.CreateInstance<UnityEngine.Localization.Settings.LocalizationSettings>();
+            settings.name = "Localization Settings";
+            AssetDatabase.CreateAsset(settings, _settings.outputFolder.TrimEnd('/') + "/Localization Settings.asset");
+            LocalizationEditorSettings.ActiveLocalizationSettings = settings;
+            Debug.Log("Loreman: the project had no active Localization Settings; made one in " + _settings.outputFolder + ".");
+        }
+
         public void EnsureLocales(IReadOnlyList<string> languages)
         {
+            EnsureLocalizationSettings();
             _byLanguage = new Dictionary<string, Locale>(StringComparer.OrdinalIgnoreCase);
             foreach (var language in languages)
             {
