@@ -1,0 +1,117 @@
+/* The look of the dialogue. Edit freely: the script only needs the element names of the UXML (panel, speaker, line, choices, next, talk, languages, status). */
+
+.root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    color: rgb(240, 240, 240);
+    font-size: 26px;
+}
+
+.status {
+    position: absolute;
+    left: 16px;
+    top: 12px;
+    font-size: 20px;
+    opacity: 0.75;
+}
+
+.languages {
+    position: absolute;
+    right: 16px;
+    top: 12px;
+    flex-direction: row;
+}
+
+.language {
+    margin-left: 6px;
+    padding: 6px 14px;
+    font-size: 20px;
+    color: rgb(240, 240, 240);
+    background-color: rgba(255, 255, 255, 0.14);
+    border-width: 0;
+    border-radius: 6px;
+}
+
+.language:hover {
+    background-color: rgba(255, 255, 255, 0.28);
+}
+
+.talk {
+    position: absolute;
+    left: 50%;
+    top: 40%;
+    width: 280px;
+    height: 72px;
+    translate: -50% 0;
+    font-size: 30px;
+    color: rgb(255, 255, 255);
+    background-color: rgb(217, 83, 79);
+    border-width: 0;
+    border-radius: 10px;
+}
+
+.talk:hover {
+    background-color: rgb(235, 110, 105);
+}
+
+.panel {
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    bottom: 4%;
+    padding: 22px 28px;
+    background-color: rgba(8, 10, 18, 0.82);
+    border-radius: 14px;
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.speaker {
+    -unity-font-style: bold;
+    font-size: 32px;
+    margin-bottom: 6px;
+}
+
+.line {
+    white-space: normal;
+    min-height: 90px;
+    font-size: 28px;
+}
+
+.choices {
+    margin-top: 10px;
+}
+
+.choice {
+    -unity-text-align: middle-left;
+    white-space: normal;
+    margin: 0 0 8px 0;
+    padding: 12px 16px;
+    font-size: 26px;
+    color: rgb(240, 240, 240);
+    background-color: rgba(255, 255, 255, 0.12);
+    border-width: 0;
+    border-radius: 8px;
+}
+
+.choice:hover {
+    background-color: rgba(255, 255, 255, 0.26);
+}
+
+.next {
+    align-self: flex-end;
+    margin-top: 8px;
+    padding: 10px 26px;
+    font-size: 24px;
+    color: rgb(240, 240, 240);
+    background-color: rgba(255, 255, 255, 0.16);
+    border-width: 0;
+    border-radius: 8px;
+}
+
+.next:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}

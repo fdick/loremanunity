@@ -206,21 +206,36 @@ namespace Loreman.Dialogues.Editor
                 _dialogues.Add(new Label("Nothing is synced yet.") { style = { opacity = 0.7f } });
                 return;
             }
-            var groups = catalog.Groups.ToDictionary(g => g.id, g => g.name);
-            var items = catalog.Dialogues.OrderBy(d => d.name).ToList();
-            var list = new ListView(items, 20, () => new Label(), (element, i) =>
+            var all = DialogueSearch.Entries(catalog);
+            var shown = all;
+            var summary = new Label { style = { marginBottom = 2, opacity = 0.75f } };
+            var list = new ListView(shown, 20, () => new Label(), (element, i) =>
             {
-                var d = items[i];
-                var group = !string.IsNullOrEmpty(d.groupId) && groups.TryGetValue(d.groupId, out var g) ? g + " / " : string.Empty;
-                ((Label)element).text = $"{group}{d.name}   ({d.nodes} nodes)";
+                var d = shown[i];
+                ((Label)element).text = $"{d.FullName}   ({d.Nodes} nodes)";
             })
             {
                 selectionType = SelectionType.None,
                 showBorder = true,
-                style = { height = Mathf.Clamp(items.Count * 20 + 4, 44, 220) },
             };
-            _dialogues.Add(new Label($"{items.Count} dialogue(s) · base language {catalog.BaseLanguage}") { style = { marginBottom = 2, opacity = 0.75f } });
+
+            void Show(string query)
+            {
+                shown = DialogueSearch.Filter(all, query);
+                list.itemsSource = shown;
+                list.style.height = Mathf.Clamp(shown.Count * 20 + 4, 44, 220);
+                list.Rebuild();
+                summary.text = string.IsNullOrWhiteSpace(query)
+                    ? $"{all.Count} dialogue(s) · base language {catalog.BaseLanguage}"
+                    : $"{shown.Count} of {all.Count} dialogue(s)";
+            }
+
+            var search = new ToolbarSearchField { style = { width = Length.Auto(), marginBottom = 4 } };
+            search.RegisterValueChangedCallback(e => Show(e.newValue));
+            _dialogues.Add(search);
+            _dialogues.Add(summary);
             _dialogues.Add(list);
+            Show(string.Empty);
         }
 
         // ── actions ──

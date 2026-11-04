@@ -1,6 +1,6 @@
 {
   "name": "com.loreman.unity",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "displayName": "Loreman Dialogues",
   "description": "Plays the dialogues of a Loreman project in Unity. A .lorebuild file made by Loreman is turned into Addressables and Unity Localization tables, so a dialogue and its texts are loaded only when the game needs them.",
   "unity": "6000.3",
@@ -19,13 +19,23 @@
   "samples": [
     {
       "displayName": "Basic Dialogue",
-      "description": "Open the scene and press Play: a complete dialogue with choices, voice-over and a language switch. Brings its own demo build.",
+      "description": "Open the scene and press Play: a complete dialogue with choices, voice-over and a language switch, using the package API directly. Brings its own demo build.",
       "path": "Samples~/BasicDialogue"
     },
     {
       "displayName": "Preload and Resume",
       "description": "Open the scene and press Play: preload a dialogue, save the place in it and resume, read the designer's note of a line. Brings its own demo build.",
       "path": "Samples~/PreloadAndResume"
+    },
+    {
+      "displayName": "Canvas Dialogue UI (uGUI)",
+      "description": "A custom dialogue screen on a Canvas: typed-out lines, answer buttons, language buttons. Needs com.unity.ugui. Brings its own demo build.",
+      "path": "Samples~/CanvasDialogue"
+    },
+    {
+      "displayName": "UI Toolkit Dialogue UI",
+      "description": "A custom dialogue screen in UI Toolkit (UXML + USS): typed-out lines, answer buttons, language buttons. Brings its own demo build.",
+      "path": "Samples~/UiToolkitDialogue"
     }
   ]
 }

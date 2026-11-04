@@ -23,6 +23,11 @@ namespace Loreman.Dialogues.Tests
         [SetUp]
         public void SetUp()
         {
+            // These tests write string tables with the fixed names the package uses (LoremanSpeakers…). In a project that already has real Loreman data
+            // they would rewrite it, so they run only in a project that has none (the package's own test project, or a scratch one).
+            var existing = UnityEditor.Localization.LocalizationEditorSettings.GetStringTableCollection(LoremanNames.SpeakersTable);
+            if (existing != null && !AssetDatabase.GetAssetPath(existing).StartsWith(Folder))
+                Assert.Ignore("This project already has Loreman data (" + AssetDatabase.GetAssetPath(existing) + "); these tests would overwrite it.");
             Cleanup();
             _settings = ScriptableObject.CreateInstance<LoremanSettings>();
             _settings.outputFolder = Folder + "/Generated";

@@ -1,0 +1,14 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="DialogueScreen.uss" />
+    <ui:VisualElement name="root" class="root">
+        <ui:Label name="status" class="status" />
+        <ui:VisualElement name="languages" class="languages" />
+        <ui:Button name="talk" text="Talk" class="talk" />
+        <ui:VisualElement name="panel" class="panel">
+            <ui:Label name="speaker" class="speaker" />
+            <ui:Label name="line" class="line" />
+            <ui:VisualElement name="choices" class="choices" />
+            <ui:Button name="next" text="Next ▶" class="next" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

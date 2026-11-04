@@ -30,6 +30,17 @@ Do not edit the generated assets: they are remade from the build. Commit them wi
 
 ## Play a dialogue
 
+The quickest way is the **`DialoguePlayer`** component (*Add Component → Loreman → Dialogue Player*): it owns the service, loads and plays the dialogue, plays the voice-over, and gives you the events for your screen:
+
+```csharp
+player.Presented += view => ShowLineOrChoice(view);   // a line, or a choice
+player.Refreshed += view => ShowLineOrChoice(view);   // the language changed: the same, in the new words
+player.Finished  += HideScreen;
+player.Play();  // or Play(dialogueId);   then player.Advance();  player.Choose(optionIndex);  player.Stop();
+```
+
+The same thing by hand, with the service:
+
 ```csharp
 using Loreman.Dialogues;
 
@@ -62,7 +73,7 @@ talk.Presented += async view =>
 };
 ```
 
-In the inspector, a field of type `DialogueReference` shows the dialogues of your build as a list, so you do not type ids:
+In the inspector, a field of type `DialogueReference` is a button with the name of the dialogue. A click opens a list **with a search box that has the focus at once**: type part of a name or of a group (several words work, in any order: `town gate`), ↑ ↓ to move, Enter or a click to pick, Esc to close; names that begin with what you typed come first, and the current dialogue is marked. The × clears the field, and a dialogue the catalog no longer has is shown in red as `(missing)`. You never type an id:
 
 ```csharp
 [SerializeField] private DialogueReference greeting;    // ... await dialogues.StartAsync(greeting);
@@ -76,10 +87,14 @@ Loreman (conditions, effects…): the package does not read it, your game may. `
 
 *Package Manager → Loreman Dialogues → Samples → Import.* Each sample is **self-contained**: it brings a scene you open and play at once, its script, and a small demo build (`CityGate.lorebuild`, English and Russian, a few voice-overs) that is synced when it is imported.
 
-- **Basic Dialogue** — start, advance, choose, play the voice-over, switch the language while it runs.
+- **Basic Dialogue** — start, advance, choose, play the voice-over, switch the language while it runs, using the package API directly.
 - **Preload and Resume** — preload a dialogue, save the place in it and resume, read the designer's note of a line.
+- **Canvas Dialogue UI (uGUI)** — a custom dialogue screen on a Canvas (needs `com.unity.ugui`): typed-out lines, answer buttons, language buttons.
+- **UI Toolkit Dialogue UI** — the same screen in UI Toolkit: structure in UXML, look in USS.
 
-Each has a README next to its script. Both draw with `OnGUI` so that they need no UI package; do the same calls from your own UI. (Both scenes are tested by playing them in Play Mode, from a project that has nothing but the package.)
+The two UI samples show the usual way to make a screen: a `DialoguePlayer` on a GameObject plays the dialogue, and the screen only listens to its events.
+
+Each has a README next to its script. The first two draw with `OnGUI` so that they need no UI package. All four scenes are tested by playing them in Play Mode (clicking their buttons) in a project that has nothing but the package.
 
 ## How it is built
 

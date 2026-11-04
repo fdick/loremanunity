@@ -1,0 +1,27 @@
+{
+    "name": "Loreman.Dialogues.Samples.Canvas",
+    "rootNamespace": "Loreman.Dialogues.Samples.Canvas",
+    "references": [
+        "Loreman.Dialogues.Core",
+        "Loreman.Dialogues.Runtime",
+        "Unity.Localization",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "LOREMAN_SAMPLE_UGUI"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.ugui",
+            "expression": "1.0.0",
+            "define": "LOREMAN_SAMPLE_UGUI"
+        }
+    ],
+    "noEngineReferences": false
+}

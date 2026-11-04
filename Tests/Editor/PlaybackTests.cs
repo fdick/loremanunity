@@ -394,5 +394,140 @@ namespace Loreman.Dialogues.Tests
                 Assert.IsTrue(talk.Current.IsChoice);
             }
         }
+
+        // ── the DialoguePlayer component ──
+
+        private DialoguePlayer NewPlayer(DialogueService service)
+        {
+            var go = new GameObject("player");
+            _made.Add(go);
+            var player = go.AddComponent<DialoguePlayer>();
+            player.UseService(service);
+            return player;
+        }
+
+        [Test]
+        public void The_player_plays_a_dialogue_and_passes_on_what_to_show()
+        {
+            var player = NewPlayer(Service());
+            var shown = new List<DialogueView>();
+            var finished = 0;
+            player.Presented += shown.Add;
+            player.Finished += () => finished++;
+
+            Run(player.InitializeAsync());
+            Assert.IsTrue(player.IsReady);
+            Assert.AreEqual(1, player.Dialogues.Count);
+
+            Run(player.PlayAsync(_id));
+            Assert.IsTrue(player.IsPlaying);
+            Assert.AreEqual("Halt!", player.Current.Text);
+            player.Advance();
+            Assert.IsTrue(player.Current.IsChoice);
+            player.Choose(0);
+            Assert.AreEqual("Move along.", player.Current.Text);
+            player.Advance();
+
+            Assert.IsFalse(player.IsPlaying);
+            Assert.IsNull(player.Current);
+            Assert.AreEqual(3, shown.Count);
+            Assert.AreEqual(1, finished);
+        }
+
+        [Test]
+        public void Play_without_an_id_plays_the_chosen_dialogue_or_the_first_of_the_catalog()
+        {
+            var player = NewPlayer(Service());
+            Run(player.InitializeAsync());
+            player.Play();
+            Assert.IsTrue(player.IsPlaying);
+            Assert.AreEqual("Halt!", player.Current.Text);
+        }
+
+        [Test]
+        public void Play_before_the_player_is_ready_waits_for_it()
+        {
+            var player = NewPlayer(new DialogueService(_loader, _texts, _audio)); // not initialized yet
+            player.Play();
+            Assert.IsTrue(player.IsReady);
+            Assert.IsTrue(player.IsPlaying);
+        }
+
+        [Test]
+        public void Stop_ends_the_dialogue_and_lets_everything_go()
+        {
+            var service = Service();
+            var player = NewPlayer(service);
+            var finished = 0;
+            player.Finished += () => finished++;
+            Run(player.PlayAsync(_id));
+            Assert.AreEqual(1, service.LoadedCount);
+
+            player.Stop();
+            Assert.IsFalse(player.IsPlaying);
+            Assert.AreEqual(1, finished);
+            Assert.AreEqual(0, service.LoadedCount);
+            Assert.AreEqual(0, _texts.Prepared);
+            Assert.AreEqual(0, _audio.Prepared);
+        }
+
+        [Test]
+        public void Playing_another_dialogue_replaces_the_one_that_was_playing()
+        {
+            var service = Service();
+            var player = NewPlayer(service);
+            Run(player.PlayAsync(_id));
+            Run(player.PlayAsync(_id));
+            Assert.AreEqual(1, service.LoadedCount, "the first conversation was let go, not kept beside the second");
+            Assert.AreEqual(1, _texts.Prepared);
+        }
+
+        [Test]
+        public void A_dialogue_that_is_still_loading_when_Stop_is_called_never_starts()
+        {
+            var service = Service();
+            var player = NewPlayer(service);
+            var shown = 0;
+            player.Presented += _ => shown++;
+            _loader.Gate = new TaskCompletionSource<bool>();
+
+            var loading = player.PlayAsync(_id);
+            player.Stop();
+            _loader.Gate.SetResult(true);
+            Run(loading);
+
+            Assert.AreEqual(0, shown);
+            Assert.IsFalse(player.IsPlaying);
+            Assert.AreEqual(0, service.LoadedCount);
+            Assert.AreEqual(0, _texts.Prepared);
+        }
+
+        [Test]
+        public void The_voice_over_of_a_line_is_asked_for_when_the_line_appears()
+        {
+            var player = NewPlayer(Service());
+            Run(player.PlayAsync(_id));
+            CollectionAssert.Contains(_audio.Calls, "load " + _graph.Nodes[0].Audio.Id);
+        }
+
+        [Test]
+        public void A_dialogue_that_cannot_be_played_is_reported_not_thrown_from_Play()
+        {
+            var player = NewPlayer(Service());
+            Exception failure = null;
+            player.Failed += e => failure = e;
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("no dialogue"));
+            Run(player.InitializeAsync());
+            player.Play(Guid.NewGuid());
+            Assert.IsNotNull(failure);
+        }
+
+        [Test]
+        public void A_service_cannot_be_replaced_once_the_player_has_started()
+        {
+            var player = NewPlayer(Service());
+            Run(player.InitializeAsync());
+            Assert.Throws<InvalidOperationException>(() => player.UseService(Service()));
+        }
     }
 }
