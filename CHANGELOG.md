@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+- **UI Toolkit sample drew no text.** Its Panel Settings pointed at the default theme of the project that made the sample, a file that does not exist anywhere else (Unity warned: *No Theme Style Sheet set to PanelSettings DialoguePanelSettings, UI will not render properly*). The sample now ships its own theme, `DialogueTheme.tss` (it imports Unity's default runtime theme), and the Panel Settings use it.
+- The UI Toolkit sample makes an `EventSystem` with the Input System's UI module when the scene has none (found by name, so it compiles without the Unity UI / Input System packages).
+- The sample scenes are now also played in a project that uses **only the new Input System**, clicking the Talk buttons with a virtual mouse (Canvas and UI Toolkit), and the test fails on the theme warning.
+
 ## 0.5.1
 
 - **UI Toolkit sample showed nothing** in projects where Unity does not make default Panel Settings for you: the scene was saved without its Panel Settings reference (the generator loaded the asset before `NewScene`, which unloaded it). The scene references `DialoguePanelSettings` now, and the screen warns and falls back to defaults if the reference is ever missing. (It worked in the clean test projects only because of that default.)

@@ -44,8 +44,33 @@ namespace Loreman.Dialogues.Samples.UiToolkit
 
         private void OnEnable()
         {
+            EnsureEventSystem();
             EnsurePanelSettings();
             if (!TryBind()) StartCoroutine(BindWhenTheDocumentIsBuilt());
+        }
+
+        /// <summary>
+        /// With the new Input System as the only input (the default of new projects) UI Toolkit needs an EventSystem with the Input System's UI module to hear the
+        /// pointer. One is made if the scene has none. It is found by name, so the sample compiles whether or not the Unity UI and Input System packages are there;
+        /// without the Unity UI package nothing is made and UI Toolkit uses its own input.
+        /// </summary>
+        private static void EnsureEventSystem()
+        {
+            var eventSystem = Type.GetType("UnityEngine.EventSystems.EventSystem, UnityEngine.UI");
+            if (eventSystem == null || FindFirstObjectByType(eventSystem) != null) return;
+            var go = new GameObject("EventSystem", eventSystem);
+#if ENABLE_INPUT_SYSTEM
+            var module = Type.GetType("UnityEngine.InputSystem.UI.InputSystemUIInputModule, Unity.InputSystem");
+            if (module != null)
+            {
+                go.AddComponent(module);
+                return;
+            }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+            var standalone = Type.GetType("UnityEngine.EventSystems.StandaloneInputModule, UnityEngine.UI");
+            if (standalone != null) go.AddComponent(standalone);
+#endif
         }
 
         /// <summary>
