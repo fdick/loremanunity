@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- The package is named **Loreman** in the Package Manager (it was "Loreman Dialogues") and the author is **Ousiron**. Samples are imported to `Assets/Samples/Loreman/<version>/…` now. The package id `com.loreman.unity` and the code namespaces are unchanged.
+
 ## 0.5.2
 
 - **UI Toolkit sample drew no text.** Its Panel Settings pointed at the default theme of the project that made the sample, a file that does not exist anywhere else (Unity warned: *No Theme Style Sheet set to PanelSettings DialoguePanelSettings, UI will not render properly*). The sample now ships its own theme, `DialogueTheme.tss` (it imports Unity's default runtime theme), and the Panel Settings use it.

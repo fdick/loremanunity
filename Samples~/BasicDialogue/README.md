@@ -2,7 +2,7 @@
 
 The smallest complete use of the package. **It brings everything it needs**: a scene, a script and a small demo build (`CityGate.lorebuild`, a guard at a city gate, in English and Russian, with a few voice-overs), so there is nothing to prepare.
 
-1. *Package Manager → Loreman Dialogues → Samples → Basic Dialogue → Import.*
+1. *Package Manager → Loreman → Samples → Basic Dialogue → Import.*
 2. Unity imports `CityGate.lorebuild` and syncs it by itself (the Console says *Loreman: dialogues synced*; the first time it also makes the Localization Settings and the `en`/`ru` locales). If it does not, use *Tools → Loreman → Window → Sync*.
 3. Open the scene **BasicDialogue** and press **Play**, then **Talk**. Click the language buttons while the guard is talking: the same line is shown again in the other language, and `♪` marks a line with a voice-over (in Russian the second recording is missing on purpose: that line is silent).
 

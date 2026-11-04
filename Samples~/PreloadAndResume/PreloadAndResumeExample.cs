@@ -119,7 +119,7 @@ namespace Loreman.Dialogues.Samples
             GUI.skin.label.richText = true;
             GUI.skin.label.wordWrap = true;
             GUILayout.BeginArea(new Rect(20, 20, Mathf.Min(560, Screen.width / scale - 40), Screen.height / scale - 40));
-            GUILayout.Label("<b>Loreman Dialogues — Preload and Resume</b>");
+            GUILayout.Label("<b>Loreman — Preload and Resume</b>");
             GUILayout.Label(_status);
 
             if (_service != null && _service.IsInitialized && _service.Dialogues.Count > 0 && _talk == null)

@@ -52,7 +52,7 @@ namespace Loreman.Dialogues.Editor
             root.style.paddingLeft = root.style.paddingRight = 10;
             root.style.paddingTop = root.style.paddingBottom = 8;
 
-            root.Add(Title("Loreman Dialogues"));
+            root.Add(Title("Loreman"));
             root.Add(Section("Builds"));
             _builds = new VisualElement();
             root.Add(_builds);

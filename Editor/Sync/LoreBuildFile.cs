@@ -71,7 +71,7 @@ namespace Loreman.Dialogues.Editor
                 if (manifest == null || manifest.format != FormatName) throw new DialogueFormatException("This is not a .lorebuild file made by Loreman.");
                 if (manifest.formatVersion > SupportedVersion)
                     throw new DialogueFormatException(
-                        $"This build is of version {manifest.formatVersion}; this package reads version {SupportedVersion}. Update the Loreman Dialogues package.");
+                        $"This build is of version {manifest.formatVersion}; this package reads version {SupportedVersion}. Update the Loreman package.");
                 return new LoreBuildFile(zip, manifest);
             }
             catch

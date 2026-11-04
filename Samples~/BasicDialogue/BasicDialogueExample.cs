@@ -105,7 +105,7 @@ namespace Loreman.Dialogues.Samples
             GUI.skin.label.wordWrap = true;
             GUILayout.BeginArea(new Rect(20, 20, Mathf.Min(560, Screen.width / scale - 40), Screen.height / scale - 40));
 
-            GUILayout.Label("<b>Loreman Dialogues — Basic Dialogue</b>");
+            GUILayout.Label("<b>Loreman — Basic Dialogue</b>");
             if (_error != null) GUILayout.Label("<color=#ff6b6b>" + _error + "</color>");
             else if (_service == null || !_service.IsInitialized) GUILayout.Label("Loading…");
             else if (_service.Dialogues.Count == 0) GUILayout.Label("The catalog has no dialogues.");

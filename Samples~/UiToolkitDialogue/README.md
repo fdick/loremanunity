@@ -2,7 +2,7 @@
 
 A custom dialogue screen made with **UI Toolkit**. **Self-contained**: it brings its scene, the UXML and USS of the screen, a Panel Settings asset, its script and the small demo build `CityGate.lorebuild`, so there is nothing to prepare.
 
-1. *Package Manager → Loreman Dialogues → Samples → UI Toolkit Dialogue UI → Import.* The demo build is synced by itself (see the Console).
+1. *Package Manager → Loreman → Samples → UI Toolkit Dialogue UI → Import.* The demo build is synced by itself (see the Console).
 2. Open the scene **UiToolkitDialogue** and press **Play**, then **Talk**.
 3. The line is typed out: **Next** shows it whole, **Next** again goes on. At a choice the answers are buttons. The language buttons (top right) switch the Unity Localization language: the open line is shown again in the new words. A `♪` marks a line or an answer that has a voice-over.
 

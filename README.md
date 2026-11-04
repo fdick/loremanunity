@@ -1,4 +1,4 @@
-# Loreman Dialogues
+# Loreman
 
 Plays the dialogues of a [Loreman](https://github.com/fdick/Loreman) project in Unity 6.3+. Loreman packs a project into one `.lorebuild` file; this package
 turns it into **Addressables** and **Unity Localization** tables, so a dialogue and its words are loaded only when the game plays it, in the language being played.
@@ -9,7 +9,7 @@ Package Manager → Add package from git URL (or *from disk*). It depends on `co
 
 ## Quick look (no Loreman project needed)
 
-*Package Manager → Loreman Dialogues → Samples → import **Basic Dialogue*** → open its scene → Play. The sample brings a demo build and everything else; see [Samples](#samples).
+*Package Manager → Loreman → Samples → import **Basic Dialogue*** → open its scene → Play. The sample brings a demo build and everything else; see [Samples](#samples).
 
 ## The Loreman window
 
@@ -98,7 +98,7 @@ Only the dialogues the game plays are loaded, and a clip is loaded when its line
 
 ## Samples
 
-*Package Manager → Loreman Dialogues → Samples → Import.* Each sample is **self-contained**: it brings a scene you open and play at once, its script, and a small demo build (`CityGate.lorebuild`, English and Russian, a few voice-overs) that is synced when it is imported.
+*Package Manager → Loreman → Samples → Import.* Each sample is **self-contained**: it brings a scene you open and play at once, its script, and a small demo build (`CityGate.lorebuild`, English and Russian, a few voice-overs) that is synced when it is imported.
 
 - **Basic Dialogue** — start, advance, choose, play the voice-over, switch the language while it runs, using the package API directly.
 - **Preload and Resume** — preload a dialogue, save the place in it and resume, read the designer's note of a line.
@@ -127,3 +127,7 @@ a fake. The file format is described in [Documentation~/BUILD_FORMAT.md](Documen
 - A voice-over has no fallback to another language: a line without a recording in the current language is silent (`LoadAudioAsync` gives `null`).
 - Recordings go into the `.lorebuild` as they were uploaded, so a project with a lot of audio gives a big file (each recording is at most 10 MB in Loreman). Loreman streams it while building; the importer reads one recording at a time too.
 - All string tables of a locale sit in the group Localization makes for it; if you want every dialogue's words in a bundle of its own, set that group's *Bundle Mode* to *Pack Separately*.
+
+## About
+
+Loreman (`com.loreman.unity`) is made by **Ousiron**. The Loreman app that makes the `.lorebuild` files is at https://github.com/fdick/Loreman.
