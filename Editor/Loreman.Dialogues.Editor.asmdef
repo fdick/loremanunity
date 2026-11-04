@@ -1,0 +1,24 @@
+{
+    "name": "Loreman.Dialogues.Editor",
+    "rootNamespace": "Loreman.Dialogues.Editor",
+    "references": [
+        "Loreman.Dialogues.Core",
+        "Loreman.Dialogues.Runtime",
+        "Unity.Addressables",
+        "Unity.Addressables.Editor",
+        "Unity.ResourceManager",
+        "Unity.Localization",
+        "Unity.Localization.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

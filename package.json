@@ -1,0 +1,19 @@
+{
+  "name": "com.loreman.dialogues",
+  "version": "0.1.0",
+  "displayName": "Loreman Dialogues",
+  "description": "Plays the dialogues of a Loreman project in Unity. A .lorebuild file made by Loreman is turned into Addressables and Unity Localization tables, so a dialogue and its texts are loaded only when the game needs them.",
+  "unity": "6000.3",
+  "documentationUrl": "https://github.com/fdick/Loreman",
+  "keywords": [
+    "dialogue",
+    "narrative",
+    "localization",
+    "addressables",
+    "loreman"
+  ],
+  "dependencies": {
+    "com.unity.addressables": "2.8.1",
+    "com.unity.localization": "1.5.13"
+  }
+}

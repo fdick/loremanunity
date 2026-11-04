@@ -1,0 +1,14 @@
+{
+    "name": "Loreman.Dialogues.Core",
+    "rootNamespace": "Loreman.Dialogues",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

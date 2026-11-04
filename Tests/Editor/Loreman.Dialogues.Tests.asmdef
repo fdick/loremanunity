@@ -1,0 +1,30 @@
+{
+    "name": "Loreman.Dialogues.Tests",
+    "rootNamespace": "Loreman.Dialogues.Tests",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Loreman.Dialogues.Core",
+        "Loreman.Dialogues.Runtime",
+        "Loreman.Dialogues.Editor",
+        "Unity.Addressables",
+        "Unity.Addressables.Editor",
+        "Unity.Localization",
+        "Unity.Localization.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

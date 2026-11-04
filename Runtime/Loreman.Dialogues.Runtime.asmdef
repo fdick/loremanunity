@@ -1,0 +1,19 @@
+{
+    "name": "Loreman.Dialogues.Runtime",
+    "rootNamespace": "Loreman.Dialogues",
+    "references": [
+        "Loreman.Dialogues.Core",
+        "Unity.Addressables",
+        "Unity.ResourceManager",
+        "Unity.Localization"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
