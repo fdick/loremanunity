@@ -44,7 +44,25 @@ namespace Loreman.Dialogues.Samples.UiToolkit
 
         private void OnEnable()
         {
+            EnsurePanelSettings();
             if (!TryBind()) StartCoroutine(BindWhenTheDocumentIsBuilt());
+        }
+
+        /// <summary>
+        /// A UIDocument draws nothing without Panel Settings. The scene has them (DialoguePanelSettings); if the reference was lost, the screen carries on with
+        /// settings of the same kind made here, and says so.
+        /// </summary>
+        private void EnsurePanelSettings()
+        {
+            var document = GetComponent<UIDocument>();
+            if (document.panelSettings != null) return;
+            Debug.LogWarning("Loreman sample: the UIDocument has no Panel Settings; using defaults. Assign DialoguePanelSettings to it.", this);
+            var settings = ScriptableObject.CreateInstance<PanelSettings>();
+            settings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            settings.referenceResolution = new Vector2Int(1920, 1080);
+            settings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
+            settings.match = 0.5f;
+            document.panelSettings = settings;
         }
 
         private IEnumerator BindWhenTheDocumentIsBuilt()

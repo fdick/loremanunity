@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- **UI Toolkit sample showed nothing** in projects where Unity does not make default Panel Settings for you: the scene was saved without its Panel Settings reference (the generator loaded the asset before `NewScene`, which unloaded it). The scene references `DialoguePanelSettings` now, and the screen warns and falls back to defaults if the reference is ever missing. (It worked in the clean test projects only because of that default.)
+- The automatic sync after a recompile now **waits** until the editor is free instead of giving up when it is still compiling or importing (after a package update nothing was synced until you ran Sync by hand).
+
 ## 0.5.0
 
 - **Builds of different Loreman projects live side by side.** Each build has a catalog of its own (`Catalogs/{project}.asset`, label `loreman.catalog`) and a speakers table of its own; a sync reads, writes and removes only its own project's dialogues. Before, one catalog served the whole Unity project and syncing a second build (for example a sample's demo build) **removed the dialogues of the first**. The first sync after the update removes the old catalog and speakers table and re-syncs each build into its own (dialogue assets are adopted, nothing is lost).

@@ -62,7 +62,15 @@ namespace Loreman.Dialogues.Editor
     internal static class LoreBuildAutoSync
     {
         [InitializeOnLoadMethod]
-        private static void AfterReload() => EditorApplication.delayCall += Run;
+        private static void AfterReload() => EditorApplication.update += WaitThenRun;
+
+        // The editor is often still compiling or importing right after a reload (a package was just updated): wait for it to be free instead of giving up.
+        private static void WaitThenRun()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            EditorApplication.update -= WaitThenRun;
+            Run();
+        }
 
         internal static void Run()
         {
