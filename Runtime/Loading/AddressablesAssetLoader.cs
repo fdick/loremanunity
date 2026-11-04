@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine.AddressableAssets;
@@ -38,6 +40,22 @@ namespace Loreman.Dialogues
                 cancellationToken.ThrowIfCancellationRequested();
             }
             return result;
+        }
+
+        public async Task<IReadOnlyList<string>> FindAddressesAsync(string label, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var handle = Addressables.LoadResourceLocationsAsync(label);
+            try
+            {
+                await handle.Task;
+                if (handle.Status != AsyncOperationStatus.Succeeded) return Array.Empty<string>();
+                return handle.Result.Select(l => l.PrimaryKey).Distinct().ToList();
+            }
+            finally
+            {
+                if (handle.IsValid()) Addressables.Release(handle);
+            }
         }
 
         public void Release(Object asset)

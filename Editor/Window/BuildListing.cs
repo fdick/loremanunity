@@ -19,6 +19,9 @@ namespace Loreman.Dialogues.Editor
 
         public string ContentHash { get; set; }
 
+        /// <summary>The Loreman project the build is of. Builds of one project replace each other; builds of different projects live side by side.</summary>
+        public Guid ProjectId { get; set; }
+
         public string BaseLanguage { get; set; }
 
         public IReadOnlyList<ManifestLanguage> Languages { get; set; } = Array.Empty<ManifestLanguage>();
@@ -37,8 +40,8 @@ namespace Loreman.Dialogues.Editor
     /// <summary>Finds the builds of the project and reads their manifests (only the manifest: nothing else is opened).</summary>
     public static class BuildListing
     {
-        /// <param name="syncedHash">The content hash of the build the catalog in the project came from (null or empty: nothing is synced).</param>
-        public static BuildInfo Read(string filePath, string assetPath, string syncedHash)
+        /// <param name="syncedHashes">The content hash of the build each project's catalog came from (a project missing here is not synced).</param>
+        public static BuildInfo Read(string filePath, string assetPath, IReadOnlyDictionary<Guid, string> syncedHashes)
         {
             var info = new BuildInfo { AssetPath = assetPath };
             try
@@ -49,11 +52,13 @@ namespace Loreman.Dialogues.Editor
                     info.ProjectName = m.projectName;
                     info.BuiltAt = m.builtAt;
                     info.ContentHash = m.contentHash;
+                    Guid.TryParse(m.projectId, out var projectId);
+                    info.ProjectId = projectId;
                     info.BaseLanguage = m.baseLanguage;
                     info.Languages = m.languages;
                     info.Dialogues = m.dialogues.Count;
                     info.Speakers = m.speakers.Count;
-                    info.IsSynced = !string.IsNullOrEmpty(syncedHash) && syncedHash == m.contentHash;
+                    info.IsSynced = syncedHashes != null && syncedHashes.TryGetValue(projectId, out var hash) && !string.IsNullOrEmpty(hash) && hash == m.contentHash;
                 }
             }
             catch (Exception e)
@@ -64,20 +69,25 @@ namespace Loreman.Dialogues.Editor
         }
 
         /// <summary>
-        /// Which build the project should be synced to without being asked, or null for none: nothing is done when the project already has one of the builds
-        /// (several different builds in a project are the user's business: syncing them in turns would only undo each other), otherwise the newest readable one.
+        /// The builds to sync without being asked: for each Loreman project, its newest readable build, unless the project in Unity is already at one of its builds
+        /// (two files of one project would only undo each other). Builds of different projects are all synced: they live side by side.
         /// </summary>
-        public static BuildInfo PickToSync(IReadOnlyList<BuildInfo> builds)
+        public static IReadOnlyList<BuildInfo> PickToSync(IReadOnlyList<BuildInfo> builds)
         {
-            if (builds.Any(b => b.Error == null && b.IsSynced)) return null;
-            return builds.Where(b => b.Error == null).OrderByDescending(b => b.BuiltAt, StringComparer.Ordinal).FirstOrDefault();
+            return builds
+                .Where(b => b.Error == null && b.ProjectId != Guid.Empty)
+                .GroupBy(b => b.ProjectId)
+                .Where(g => !g.Any(b => b.IsSynced))
+                .Select(g => g.OrderByDescending(b => b.BuiltAt, StringComparer.Ordinal).First())
+                .OrderBy(b => b.AssetPath, StringComparer.Ordinal)
+                .ToList();
         }
 
         /// <summary>Every .lorebuild under Assets, the newest build first (a damaged file last).</summary>
-        public static IReadOnlyList<BuildInfo> FindAll(string syncedHash)
+        public static IReadOnlyList<BuildInfo> FindAll(IReadOnlyDictionary<Guid, string> syncedHashes)
         {
             return LoreBuildSync.FindBuilds()
-                .Select(assetPath => Read(Path.GetFullPath(assetPath), assetPath, syncedHash))
+                .Select(assetPath => Read(Path.GetFullPath(assetPath), assetPath, syncedHashes))
                 .OrderBy(b => b.Error != null)
                 .ThenByDescending(b => b.BuiltAt, StringComparer.Ordinal)
                 .ToList();

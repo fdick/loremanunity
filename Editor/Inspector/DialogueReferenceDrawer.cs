@@ -14,23 +14,23 @@ namespace Loreman.Dialogues.Editor
         private const float ClearWidth = 22f;
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label) =>
-            CatalogLocator.Find() == null ? EditorGUIUtility.singleLineHeight * 2f : EditorGUIUtility.singleLineHeight;
+            CatalogLocator.FindAll().Count == 0 ? EditorGUIUtility.singleLineHeight * 2f : EditorGUIUtility.singleLineHeight;
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             var id = property.FindPropertyRelative("id");
-            var catalog = CatalogLocator.Find();
+            var catalogs = CatalogLocator.FindAll();
 
             EditorGUI.BeginProperty(position, label, property);
             position = EditorGUI.PrefixLabel(position, label);
-            if (catalog == null)
+            if (catalogs.Count == 0)
             {
                 EditorGUI.HelpBox(position, "No catalog yet: add a .lorebuild file (Tools → Loreman → Window).", MessageType.Info);
                 EditorGUI.EndProperty();
                 return;
             }
 
-            var entries = DialogueSearch.Entries(catalog);
+            var entries = DialogueSearch.Entries(catalogs);
             var text = DialogueSearch.Label(entries, id.stringValue);
             var missing = text.StartsWith("(missing)");
             var hasValue = !string.IsNullOrEmpty(id.stringValue);
@@ -68,17 +68,26 @@ namespace Loreman.Dialogues.Editor
         }
     }
 
-    /// <summary>Finds the catalog the importer made.</summary>
+    /// <summary>Finds the catalogs the importer made: one for each Loreman build in the project.</summary>
     public static class CatalogLocator
     {
-        public static DialogueCatalog Find()
+        public static IReadOnlyList<DialogueCatalog> FindAll()
         {
+            var catalogs = new List<DialogueCatalog>();
             foreach (var guid in AssetDatabase.FindAssets("t:DialogueCatalog"))
             {
                 var catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(AssetDatabase.GUIDToAssetPath(guid));
-                if (catalog != null) return catalog;
+                if (catalog != null && catalog.ProjectGuid != System.Guid.Empty) catalogs.Add(catalog);
             }
-            return null;
+            return catalogs;
+        }
+
+        /// <summary>For each Loreman project: the content hash of the build its catalog came from.</summary>
+        public static Dictionary<System.Guid, string> HashesByProject()
+        {
+            var hashes = new Dictionary<System.Guid, string>();
+            foreach (var catalog in FindAll()) hashes[catalog.ProjectGuid] = catalog.ContentHash;
+            return hashes;
         }
     }
 }

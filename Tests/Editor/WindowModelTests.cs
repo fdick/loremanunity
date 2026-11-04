@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -16,7 +17,7 @@ namespace Loreman.Dialogues.Tests
         public void SetUp() => _settings = ScriptableObject.CreateInstance<LoremanSettings>();
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(_settings);
+        public void TearDown() => UnityEngine.Object.DestroyImmediate(_settings);
 
         private static IEnumerable<SettingsIssue> Errors(IEnumerable<SettingsIssue> issues) => issues.Where(i => i.Severity == IssueSeverity.Error);
 
@@ -132,9 +133,16 @@ namespace Loreman.Dialogues.Tests
         {
             var path = SampleBuild.Path;
             string hash;
-            using (var file = SampleBuild.Open()) hash = file.Manifest.contentHash;
+            Guid project;
+            using (var file = SampleBuild.Open())
+            {
+                hash = file.Manifest.contentHash;
+                project = Guid.Parse(file.Manifest.projectId);
+            }
+            IReadOnlyDictionary<Guid, string> Synced(string h, Guid p) => new Dictionary<Guid, string> { [p] = h };
 
             var fresh = BuildListing.Read(path, "Assets/x/sample.lorebuild", null);
+            Assert.AreEqual(project, fresh.ProjectId);
             Assert.IsNull(fresh.Error);
             Assert.AreEqual("My Game!", fresh.ProjectName);
             Assert.AreEqual("sample.lorebuild", fresh.FileName);
@@ -142,20 +150,39 @@ namespace Loreman.Dialogues.Tests
             Assert.AreEqual(3, fresh.Languages.Count);
             Assert.IsFalse(fresh.IsSynced);
 
-            Assert.IsTrue(BuildListing.Read(path, "Assets/x/sample.lorebuild", hash).IsSynced);
-            Assert.IsFalse(BuildListing.Read(path, "Assets/x/sample.lorebuild", "an older build").IsSynced);
+            Assert.IsTrue(BuildListing.Read(path, "Assets/x/sample.lorebuild", Synced(hash, project)).IsSynced);
+            Assert.IsFalse(BuildListing.Read(path, "Assets/x/sample.lorebuild", Synced("an older build", project)).IsSynced);
+            Assert.IsFalse(BuildListing.Read(path, "Assets/x/sample.lorebuild", Synced(hash, Guid.NewGuid())).IsSynced, "another project's catalog does not make this build synced");
         }
 
-        private static BuildInfo B(string built, bool synced = false, string error = null) =>
-            new BuildInfo { AssetPath = "Assets/" + built + ".lorebuild", BuiltAt = built, IsSynced = synced, Error = error };
+        private static readonly Guid ProjectA = Guid.NewGuid();
+        private static readonly Guid ProjectB = Guid.NewGuid();
+
+        private static BuildInfo B(string built, bool synced = false, string error = null, Guid? project = null) =>
+            new BuildInfo { AssetPath = "Assets/" + built + ".lorebuild", BuiltAt = built, IsSynced = synced, Error = error, ProjectId = project ?? ProjectA };
 
         [Test]
         public void The_project_is_brought_to_the_newest_readable_build_unless_it_already_has_one_of_them()
         {
-            Assert.IsNull(BuildListing.PickToSync(new BuildInfo[0]));
-            Assert.AreEqual("2026-11-05", BuildListing.PickToSync(new[] { B("2026-11-01"), B("2026-11-05"), B("2026-11-09", error: "damaged") }).BuiltAt);
-            Assert.IsNull(BuildListing.PickToSync(new[] { B("2026-11-01", synced: true), B("2026-11-05") }), "an older build is the project's own choice: leave it");
-            Assert.IsNull(BuildListing.PickToSync(new[] { B("x", error: "damaged") }));
+            Assert.IsEmpty(BuildListing.PickToSync(new BuildInfo[0]));
+            Assert.AreEqual("2026-11-05", BuildListing.PickToSync(new[] { B("2026-11-01"), B("2026-11-05"), B("2026-11-09", error: "damaged") }).Single().BuiltAt);
+            Assert.IsEmpty(BuildListing.PickToSync(new[] { B("2026-11-01", synced: true), B("2026-11-05") }), "an older build is the project's own choice: leave it");
+            Assert.IsEmpty(BuildListing.PickToSync(new[] { B("x", error: "damaged") }));
+        }
+
+        [Test]
+        public void Every_project_gets_its_own_newest_build_so_builds_of_different_projects_do_not_compete()
+        {
+            var picked = BuildListing.PickToSync(new[]
+            {
+                B("2026-11-01", project: ProjectA), B("2026-11-09", project: ProjectA),
+                B("b-only", project: ProjectB),
+            });
+            CollectionAssert.AreEquivalent(new[] { "2026-11-09", "b-only" }, picked.Select(b => b.BuiltAt));
+
+            // project B is already synced, project A is not
+            var onlyA = BuildListing.PickToSync(new[] { B("2026-11-09", project: ProjectA), B("b-only", synced: true, project: ProjectB) });
+            CollectionAssert.AreEqual(new[] { "2026-11-09" }, onlyA.Select(b => b.BuiltAt));
         }
 
         [Test]
@@ -190,7 +217,7 @@ namespace Loreman.Dialogues.Tests
             }
             finally
             {
-                Object.DestroyImmediate(window);
+                UnityEngine.Object.DestroyImmediate(window);
             }
         }
     }

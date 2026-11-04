@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -131,8 +132,8 @@ namespace Loreman.Dialogues.Editor
         public void Refresh()
         {
             if (_builds == null || _settings == null) return;
-            var catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.CatalogPath);
-            var builds = BuildListing.FindAll(catalog != null ? catalog.ContentHash : null);
+            var catalogs = CatalogLocator.FindAll();
+            var builds = BuildListing.FindAll(CatalogLocator.HashesByProject());
 
             _builds.Clear();
             if (builds.Count == 0)
@@ -140,8 +141,8 @@ namespace Loreman.Dialogues.Editor
             foreach (var build in builds) _builds.Add(BuildCard(build));
 
             ShowIssues();
-            ShowLanguages(builds.FirstOrDefault(b => b.Error == null));
-            ShowDialogues(catalog);
+            ShowLanguages(builds);
+            ShowDialogues(catalogs);
         }
 
         private VisualElement BuildCard(BuildInfo build)
@@ -172,17 +173,29 @@ namespace Loreman.Dialogues.Editor
             return card;
         }
 
-        private void ShowLanguages(BuildInfo build = null)
+        private void ShowLanguages(IReadOnlyList<BuildInfo> builds)
         {
             if (_languages == null) return;
             _languages.Clear();
-            if (build == null)
+            var readable = builds.Where(b => b.Error == null).ToList();
+            if (readable.Count == 0)
             {
                 _languages.Add(new Label("The languages appear when there is a build.") { style = { opacity = 0.7f } });
                 return;
             }
 
             var existing = LocalizationEditorSettings.GetLocales().Select(l => l.Identifier.Code).ToHashSet();
+            foreach (var build in readable)
+            {
+                // with several builds each one has its own list, under its name
+                if (readable.Count > 1)
+                    _languages.Add(new Label(string.IsNullOrEmpty(build.ProjectName) ? build.FileName : build.ProjectName) { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 4 } });
+                ShowLanguageRows(build, existing);
+            }
+        }
+
+        private void ShowLanguageRows(BuildInfo build, HashSet<string> existing)
+        {
             foreach (var row in LanguageRows.Build(build.Languages, build.BaseLanguage, _settings.LocaleMap(), existing))
             {
                 var line = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginBottom = 2 } };
@@ -196,17 +209,17 @@ namespace Loreman.Dialogues.Editor
             }
         }
 
-        private void ShowLanguages() => ShowLanguages(BuildListing.FindAll(null).FirstOrDefault(b => b.Error == null));
+        private void ShowLanguages() => ShowLanguages(BuildListing.FindAll(CatalogLocator.HashesByProject()));
 
-        private void ShowDialogues(DialogueCatalog catalog)
+        private void ShowDialogues(IReadOnlyList<DialogueCatalog> catalogs)
         {
             _dialogues.Clear();
-            if (catalog == null)
+            if (catalogs.Count == 0)
             {
                 _dialogues.Add(new Label("Nothing is synced yet.") { style = { opacity = 0.7f } });
                 return;
             }
-            var all = DialogueSearch.Entries(catalog);
+            var all = DialogueSearch.Entries(catalogs);
             var shown = all;
             var summary = new Label { style = { marginBottom = 2, opacity = 0.75f } };
             var list = new ListView(shown, 20, () => new Label(), (element, i) =>
@@ -226,7 +239,7 @@ namespace Loreman.Dialogues.Editor
                 list.style.height = Mathf.Clamp(shown.Count * 20 + 4, 44, 220);
                 list.Rebuild();
                 summary.text = string.IsNullOrWhiteSpace(query)
-                    ? $"{all.Count} dialogue(s) · base language {catalog.BaseLanguage}"
+                    ? $"{all.Count} dialogue(s) in {catalogs.Count} build(s)"
                     : $"{shown.Count} of {all.Count} dialogue(s)";
             }
 

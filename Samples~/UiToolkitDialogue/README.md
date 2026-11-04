@@ -13,4 +13,4 @@ How it is built:
 - `UiToolkitDialogueScreen` fills the elements: it listens to `player.Presented` / `Refreshed` / `Finished`, makes a `Button` per answer, types the line out with the element scheduler, and calls `player.Advance()` / `player.Choose(i)`.
 - `DialoguePanelSettings` scales the screen with the window (reference 1920×1080).
 
-To use your own dialogue: put your `.lorebuild` into `Assets` and pick the dialogue on the *Dialogue Player* (empty = the first dialogue of the catalog).
+To use your own dialogue: put your `.lorebuild` into `Assets` and pick the dialogue on the *Dialogue Player* (the sample plays its own *City Gate*, whatever other builds the project has; clear the field to play the first dialogue of the project).

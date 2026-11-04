@@ -51,6 +51,26 @@ namespace Loreman.Dialogues.Editor
         public static List<DialogueEntry> Entries(DialogueCatalog catalog) => Entries(catalog.Groups, catalog.Dialogues);
 
         /// <summary>
+        /// The dialogues of every catalog in the project. With more than one build the name of the project goes before the group, so two "Intro" dialogues of
+        /// two projects can be told apart.
+        /// </summary>
+        public static List<DialogueEntry> Entries(IReadOnlyList<DialogueCatalog> catalogs)
+        {
+            if (catalogs.Count == 1) return Entries(catalogs[0]);
+            var all = new List<DialogueEntry>();
+            foreach (var catalog in catalogs)
+            {
+                var project = string.IsNullOrWhiteSpace(catalog.ProjectName) ? "Project" : catalog.ProjectName;
+                foreach (var e in Entries(catalog))
+                    all.Add(new DialogueEntry(e.Id, e.Name, e.HasGroup ? project + " / " + e.Group : project, e.Nodes));
+            }
+            return all
+                .OrderBy(e => e.Group, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        /// <summary>
         /// The entries that match what was typed, best first. Every word of the query must be somewhere in "group name"; ignoring case.
         /// A name that begins with the query comes first, then a name that has all the words, then the ones that match only through the group.
         /// An empty query keeps everything in the order given.

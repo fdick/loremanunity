@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -35,18 +36,21 @@ namespace Loreman.Dialogues
 
         public bool IsInitialized => _initialized;
 
-        /// <summary>What the build holds (null before <see cref="InitializeAsync"/>).</summary>
-        public DialogueCatalog Catalog => _library.Catalog;
+        /// <summary>The catalogs of the project, one for each Loreman build (empty before <see cref="InitializeAsync"/>).</summary>
+        public IReadOnlyList<DialogueCatalog> Catalogs => _library.Catalogs;
+
+        /// <summary>The dialogues of all the builds in the project.</summary>
+        public IReadOnlyList<CatalogDialogue> Dialogues => _library.Dialogues;
 
         /// <summary>How many dialogues are in memory now.</summary>
         public int LoadedCount => _library.LoadedCount;
 
-        /// <summary>Loads the catalog and the texts of the speakers. Call it once, at the start of the game.</summary>
+        /// <summary>Loads the catalogs and the texts of the speakers. Call it once, at the start of the game.</summary>
         public async Task InitializeAsync(CancellationToken cancellationToken = default)
         {
             if (_initialized) return;
             await _library.InitializeAsync(cancellationToken);
-            await _texts.InitializeAsync(_library.Catalog, cancellationToken);
+            await _texts.InitializeAsync(_library.Catalogs, cancellationToken);
             _initialized = true;
         }
 
@@ -55,7 +59,7 @@ namespace Loreman.Dialogues
         {
             if (!_initialized) throw new InvalidOperationException("Loreman: await InitializeAsync before starting a dialogue.");
             var (lease, audioPrepared) = await AcquireAsync(dialogueId, cancellationToken);
-            return new DialogueConversation(lease, _library.Catalog, _texts, _audio, audioPrepared);
+            return new DialogueConversation(lease, _library.CatalogOf(dialogueId), _texts, _audio, audioPrepared);
         }
 
         /// <summary>Loads the graph and gets the texts (and the voice-overs, when the dialogue has any) ready. On a failure nothing stays held.</summary>

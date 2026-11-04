@@ -45,7 +45,7 @@ namespace Loreman.Dialogues.Samples
             try
             {
                 // 2. Opening a dialogue loads its graph and its words, in the language being played. Only this dialogue's.
-                var id = dialogue.IsSet ? dialogue.Guid : _service.Catalog.Dialogues[0].Guid;
+                var id = dialogue.IsSet ? dialogue.Guid : _service.Dialogues[0].Guid;
                 _talk = await _service.StartAsync(id);
                 _talk.Presented += OnPresented;   // a new line, or a choice
                 _talk.Refreshed += OnRefreshed;   // the same line again, because the language was changed
@@ -86,7 +86,9 @@ namespace Loreman.Dialogues.Samples
             {
                 // 3. A clip is loaded when it is asked for. It can be missing in this language: then it is null and the line is silent.
                 var clip = await _talk.LoadAudioAsync(view);
-                if (clip != null && _view == view) voice.PlayOneShot(clip);
+                if (clip == null || _view != view) return;
+                voice.clip = clip; // a long recording is streamed, and a streamed clip is played as the clip of the source
+                voice.Play();
             }
             catch (OperationCanceledException) { }
             catch (Exception e)
@@ -106,10 +108,10 @@ namespace Loreman.Dialogues.Samples
             GUILayout.Label("<b>Loreman Dialogues — Basic Dialogue</b>");
             if (_error != null) GUILayout.Label("<color=#ff6b6b>" + _error + "</color>");
             else if (_service == null || !_service.IsInitialized) GUILayout.Label("Loading…");
-            else if (_service.Catalog.Dialogues.Count == 0) GUILayout.Label("The catalog has no dialogues.");
+            else if (_service.Dialogues.Count == 0) GUILayout.Label("The catalog has no dialogues.");
             else if (_talk == null)
             {
-                GUILayout.Label("Dialogue: " + (dialogue.IsSet ? dialogue.ToString() : _service.Catalog.Dialogues[0].name));
+                GUILayout.Label("Dialogue: " + (dialogue.IsSet ? dialogue.ToString() : _service.Dialogues[0].name));
                 if (GUILayout.Button("Talk")) StartTalking();
             }
             else if (_view != null) DrawView(_view);

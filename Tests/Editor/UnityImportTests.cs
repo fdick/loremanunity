@@ -25,7 +25,7 @@ namespace Loreman.Dialogues.Tests
         {
             // These tests write string tables with the fixed names the package uses (LoremanSpeakers…). In a project that already has real Loreman data
             // they would rewrite it, so they run only in a project that has none (the package's own test project, or a scratch one).
-            var existing = UnityEditor.Localization.LocalizationEditorSettings.GetStringTableCollection(LoremanNames.SpeakersTable);
+            var existing = UnityEditor.Localization.LocalizationEditorSettings.GetStringTableCollection(LoremanNames.SpeakersTable(ProjectOf(SampleBuild.Open)));
             if (existing != null && !AssetDatabase.GetAssetPath(existing).StartsWith(Folder))
                 Assert.Ignore("This project already has Loreman data (" + AssetDatabase.GetAssetPath(existing) + "); these tests would overwrite it.");
             Cleanup();
@@ -54,10 +54,25 @@ namespace Loreman.Dialogues.Tests
             AssetDatabase.Refresh();
         }
 
+        private static Guid ProjectOf(Func<LoreBuildFile> open)
+        {
+            using (var file = open()) return Guid.Parse(file.Manifest.projectId);
+        }
+
+        private Guid SampleProject => ProjectOf(SampleBuild.Open);
+
+        private UnitySyncTarget Target() => new UnitySyncTarget(_settings, SampleProject);
+
         private SyncReport Sync(bool force = false)
         {
             using (var file = SampleBuild.Open())
-                return BuildSynchronizer.Run(file, new UnitySyncTarget(_settings), force);
+                return BuildSynchronizer.Run(file, Target(), force);
+        }
+
+        private SyncReport SyncOther()
+        {
+            using (var file = SampleBuild.OpenOther())
+                return BuildSynchronizer.Run(file, new UnitySyncTarget(_settings, Guid.Parse(file.Manifest.projectId)));
         }
 
         [Test]
@@ -70,7 +85,7 @@ namespace Loreman.Dialogues.Tests
             Guid id;
             using (var file = SampleBuild.Open())
             {
-                catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.CatalogPath);
+                catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.CatalogPath(SampleProject));
                 id = SampleBuild.Gate(file.Manifest).Guid;
                 Assert.AreEqual(file.Manifest.contentHash, catalog.ContentHash);
             }
@@ -92,7 +107,9 @@ namespace Loreman.Dialogues.Tests
             var dialogueEntry = aa.FindAssetEntry(AssetDatabase.AssetPathToGUID(_settings.DialoguePath(id)));
             Assert.AreEqual(LoremanNames.DialogueAddress(id), dialogueEntry.address);
             Assert.IsTrue(dialogueEntry.labels.Contains(LoremanNames.Label));
-            Assert.AreEqual(LoremanNames.CatalogAddress, aa.FindAssetEntry(AssetDatabase.AssetPathToGUID(_settings.CatalogPath)).address);
+            var catalogEntry = aa.FindAssetEntry(AssetDatabase.AssetPathToGUID(_settings.CatalogPath(SampleProject)));
+            Assert.AreEqual(LoremanNames.CatalogAddress(SampleProject), catalogEntry.address);
+            Assert.IsTrue(catalogEntry.labels.Contains(LoremanNames.CatalogLabel), "the game finds the catalogs by this label");
         }
 
         [Test]
@@ -114,7 +131,7 @@ namespace Loreman.Dialogues.Tests
                 Assert.IsNull(ru.GetEntry(g.Nodes[2].Text.Id), "not translated: the game falls back to the base language");
                 Assert.AreEqual("node:" + g.Nodes[0].Id.ToString("D"), collection.SharedData.GetEntry(g.Nodes[0].Text.Id).Key);
 
-                var speakers = LocalizationEditorSettings.GetStringTableCollection(LoremanNames.SpeakersTable);
+                var speakers = LocalizationEditorSettings.GetStringTableCollection(LoremanNames.SpeakersTable(SampleProject));
                 var guard = file.Manifest.speakers[g.Nodes[0].Speaker];
                 Assert.AreEqual("Guard", ((StringTable)speakers.GetTable("en")).GetEntry(guard.nameKey).Value);
                 Assert.AreEqual("Стражник", ((StringTable)speakers.GetTable("ru")).GetEntry(guard.nameKey).Value);
@@ -155,7 +172,7 @@ namespace Loreman.Dialogues.Tests
             Sync();
             Guid id;
             using (var file = SampleBuild.Open()) id = SampleBuild.Gate(file.Manifest).Guid;
-            new UnitySyncTarget(_settings).RemoveDialogue(id);
+            Target().RemoveDialogue(id);
             AssetDatabase.Refresh();
             Assert.IsNull(LocalizationEditorSettings.GetAssetTableCollection(LoremanNames.AudioTable(id)));
             Assert.IsFalse(AssetDatabase.IsValidFolder(_settings.AudioFolder(id)));
@@ -196,7 +213,7 @@ namespace Loreman.Dialogues.Tests
         public void A_dialogue_that_is_gone_from_the_build_loses_its_asset_and_its_tables()
         {
             Sync();
-            var target = new UnitySyncTarget(_settings);
+            var target = Target();
             Guid id;
             using (var file = SampleBuild.Open()) id = SampleBuild.Gate(file.Manifest).Guid;
             target.RemoveDialogue(id);
@@ -211,15 +228,96 @@ namespace Loreman.Dialogues.Tests
         {
             Sync();
             var aa = AddressableAssetSettingsDefaultObject.GetSettings(false);
-            aa.RemoveAssetEntry(AssetDatabase.AssetPathToGUID(_settings.CatalogPath), false);
+            aa.RemoveAssetEntry(AssetDatabase.AssetPathToGUID(_settings.CatalogPath(SampleProject)), false);
             using (var file = SampleBuild.Open())
                 aa.RemoveAssetEntry(AssetDatabase.AssetPathToGUID(_settings.DialoguePath(SampleBuild.Gate(file.Manifest).Guid)), false);
 
             var report = Sync();
             Assert.IsFalse(report.WasUpToDate);
             Assert.AreEqual(1, report.Added); // the dialogue counted as missing
-            Assert.AreEqual(LoremanNames.CatalogAddress, aa.FindAssetEntry(AssetDatabase.AssetPathToGUID(_settings.CatalogPath)).address);
+            Assert.AreEqual(LoremanNames.CatalogAddress(SampleProject), aa.FindAssetEntry(AssetDatabase.AssetPathToGUID(_settings.CatalogPath(SampleProject))).address);
             Assert.IsTrue(Sync().WasUpToDate);
+        }
+
+        [Test]
+        public void Builds_of_different_projects_live_side_by_side_and_do_not_wipe_each_other()
+        {
+            Sync();
+            var other = SyncOther();
+            Assert.AreEqual(1, other.Added);
+            Assert.AreEqual(0, other.Removed, "the other build's dialogue must not remove the first build's");
+
+            Guid sampleDialogue, otherDialogue;
+            using (var file = SampleBuild.Open()) sampleDialogue = SampleBuild.Gate(file.Manifest).Guid;
+            using (var file = SampleBuild.OpenOther()) otherDialogue = file.Manifest.dialogues.Single().Guid;
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<DialogueAsset>(_settings.DialoguePath(sampleDialogue)));
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<DialogueAsset>(_settings.DialoguePath(otherDialogue)));
+
+            // two catalogs, each with its own dialogue and its own speakers table
+            Assert.AreEqual(2, AssetDatabase.FindAssets("t:DialogueCatalog", new[] { _settings.CatalogsFolder }).Length);
+            Assert.AreEqual(sampleDialogue, Target().ExistingDialogues().Keys.Single());
+            Assert.IsNotNull(LocalizationEditorSettings.GetStringTableCollection(LoremanNames.SpeakersTable(SampleProject)));
+            using (var file = SampleBuild.OpenOther())
+                Assert.IsNotNull(LocalizationEditorSettings.GetStringTableCollection(LoremanNames.SpeakersTable(Guid.Parse(file.Manifest.projectId))));
+
+            // and each is up to date on its own
+            Assert.IsTrue(Sync().WasUpToDate);
+            Assert.IsTrue(SyncOther().WasUpToDate);
+        }
+
+        [Test]
+        public void The_catalog_and_speakers_of_an_older_version_are_removed_and_the_dialogues_adopted_by_their_build()
+        {
+            Sync();
+            // an older version kept one catalog and one speakers table for everything
+            var legacy = ScriptableObject.CreateInstance<DialogueCatalog>();
+            AssetDatabase.CreateAsset(legacy, _settings.LegacyCatalogPath);
+            var legacyCollection = LocalizationEditorSettings.CreateStringTableCollection(LoremanNames.LegacySpeakersTable, _settings.TablesFolder, LocalizationEditorSettings.GetLocales());
+            Assert.IsNotNull(legacyCollection);
+
+            var report = Sync(force: true);
+            Assert.IsFalse(report.WasUpToDate);
+            Assert.IsNull(AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.LegacyCatalogPath));
+            Assert.IsNull(LocalizationEditorSettings.GetStringTableCollection(LoremanNames.LegacySpeakersTable));
+            Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.CatalogPath(SampleProject)));
+        }
+
+        [Test]
+        public void Voice_overs_are_imported_as_mono_vorbis_game_audio_and_a_short_one_is_not_streamed()
+        {
+            Sync();
+            using (var file = SampleBuild.Open())
+            {
+                var gate = SampleBuild.Gate(file.Manifest);
+                var line = SampleBuild.GateGraph(file).Nodes[0];
+                var path = _settings.AudioFolder(gate.Guid) + "/en/" + line.Id.ToString("N") + ".wav";
+                var importer = (AudioImporter)AssetImporter.GetAtPath(path);
+                Assert.IsNotNull(importer);
+                Assert.IsTrue(importer.forceToMono);
+                Assert.IsFalse(importer.defaultSampleSettings.preloadAudioData);
+                Assert.IsTrue(importer.loadInBackground);
+                Assert.AreEqual(AudioCompressionFormat.Vorbis, importer.defaultSampleSettings.compressionFormat);
+                Assert.AreEqual(0.5f, importer.defaultSampleSettings.quality, 0.001f);
+                Assert.AreEqual(AudioClipLoadType.CompressedInMemory, importer.defaultSampleSettings.loadType);
+                Assert.AreEqual(VoiceOverImportSettings.Marker, importer.userData);
+            }
+        }
+
+        [Test]
+        public void A_long_recording_is_streamed_and_a_short_one_is_kept_in_memory()
+        {
+            // the rule, without importing a big file: bigger than the limit streams, smaller does not
+            var big = ScriptableObject.CreateInstance<LoremanSettings>();
+            try
+            {
+                big.streamLargerThanKB = 100;
+                Assert.AreEqual(AudioClipLoadType.Streaming, VoiceOverImportSettings.LoadTypeFor(big, 101 * 1024L));
+                Assert.AreEqual(AudioClipLoadType.CompressedInMemory, VoiceOverImportSettings.LoadTypeFor(big, 100 * 1024L));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(big);
+            }
         }
 
         [Test]

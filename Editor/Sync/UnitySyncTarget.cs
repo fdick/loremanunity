@@ -19,13 +19,17 @@ namespace Loreman.Dialogues.Editor
     public sealed class UnitySyncTarget : ISyncTarget
     {
         private readonly LoremanSettings _settings;
+        private readonly Guid _projectId;
         private readonly IReadOnlyDictionary<string, string> _localeMap;
         private List<Locale> _locales = new List<Locale>();
         private Dictionary<string, Locale> _byLanguage = new Dictionary<string, Locale>(StringComparer.OrdinalIgnoreCase);
 
-        public UnitySyncTarget(LoremanSettings settings)
+        /// <param name="projectId">The Loreman project of the build being synced. Everything the target reads or removes belongs to this project only: another build in the Unity project is left alone.</param>
+        public UnitySyncTarget(LoremanSettings settings, Guid projectId)
         {
             _settings = settings != null ? settings : throw new ArgumentNullException(nameof(settings));
+            if (projectId == Guid.Empty) throw new ArgumentException("The build has no project id.", nameof(projectId));
+            _projectId = projectId;
             _localeMap = settings.LocaleMap();
         }
 
@@ -33,25 +37,30 @@ namespace Loreman.Dialogues.Editor
         {
             get
             {
-                var catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.CatalogPath);
+                var path = _settings.CatalogPath(_projectId);
+                var catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(path);
                 // a catalog that is not in Addressables (its entry was removed) is as good as none: the game could not load it
-                if (catalog == null || !IsRegistered(_settings.CatalogPath, LoremanNames.CatalogAddress)) return string.Empty;
+                if (catalog == null || !IsRegistered(path, LoremanNames.CatalogAddress(_projectId))) return string.Empty;
                 return catalog.ContentHash ?? string.Empty;
             }
         }
 
         public IReadOnlyDictionary<Guid, string> ExistingDialogues()
         {
+            // Only the dialogues of this project's catalog: the dialogues of another build in the project are not ours to change or remove.
             var result = new Dictionary<Guid, string>();
-            if (!AssetDatabase.IsValidFolder(_settings.DialoguesFolder)) return result;
-            foreach (var guid in AssetDatabase.FindAssets("t:DialogueAsset", new[] { _settings.DialoguesFolder }))
+            var catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.CatalogPath(_projectId));
+            if (catalog == null) return result;
+            foreach (var entry in catalog.Dialogues)
             {
-                var asset = AssetDatabase.LoadAssetAtPath<DialogueAsset>(AssetDatabase.GUIDToAssetPath(guid));
-                if (asset == null || asset.Id == Guid.Empty) continue;
+                var id = entry.Guid;
+                var path = _settings.DialoguePath(id);
+                var asset = AssetDatabase.LoadAssetAtPath<DialogueAsset>(path);
+                if (asset == null || asset.Id != id) continue;
                 // an asset whose texts were deleted, or that is not in Addressables any more, is as good as missing: the sync makes it again
-                if (LocalizationEditorSettings.GetStringTableCollection(LoremanNames.DialogueTable(asset.Id)) == null) continue;
-                if (!IsRegistered(AssetDatabase.GUIDToAssetPath(guid), LoremanNames.DialogueAddress(asset.Id))) continue;
-                result[asset.Id] = asset.Hash;
+                if (LocalizationEditorSettings.GetStringTableCollection(LoremanNames.DialogueTable(id)) == null) continue;
+                if (!IsRegistered(path, LoremanNames.DialogueAddress(id))) continue;
+                result[id] = asset.Hash;
             }
             return result;
         }
@@ -69,10 +78,31 @@ namespace Loreman.Dialogues.Editor
             LoremanSettings.EnsureFolder(_settings.outputFolder.TrimEnd('/'));
             LoremanSettings.EnsureFolder(_settings.DialoguesFolder);
             LoremanSettings.EnsureFolder(_settings.TablesFolder);
+            LoremanSettings.EnsureFolder(_settings.CatalogsFolder);
+            VoiceOverImportSettings.Active = _settings;
+            RemoveLegacy();
+        }
+
+        /// <summary>
+        /// The first versions kept one catalog and one speakers table for the whole Unity project, so a second build wiped the dialogues of the first.
+        /// They are removed here; every build gets its own catalog the next time it is synced (the dialogue assets stay and are adopted by their build).
+        /// </summary>
+        private void RemoveLegacy()
+        {
+            var legacy = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(_settings.LegacyCatalogPath);
+            if (legacy != null)
+            {
+                var guid = AssetDatabase.AssetPathToGUID(_settings.LegacyCatalogPath);
+                AddressableAssetSettingsDefaultObject.GetSettings(false)?.RemoveAssetEntry(guid, false);
+                AssetDatabase.DeleteAsset(_settings.LegacyCatalogPath);
+                Debug.Log("Loreman: removed the catalog of an older version; each build now has a catalog of its own and is synced into it.");
+            }
+            DeleteCollection(LocalizationEditorSettings.GetStringTableCollection(LoremanNames.LegacySpeakersTable));
         }
 
         public void End()
         {
+            VoiceOverImportSettings.Active = null;
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
@@ -213,11 +243,11 @@ namespace Loreman.Dialogues.Editor
             if (AssetDatabase.IsValidFolder(folder)) AssetDatabase.DeleteAsset(folder);
         }
 
-        public void WriteSpeakers(IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) => FillCollection(LoremanNames.SpeakersTable, texts);
+        public void WriteSpeakers(IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) => FillCollection(LoremanNames.SpeakersTable(_projectId), texts);
 
         public void WriteCatalog(BuildManifest manifest)
         {
-            var path = _settings.CatalogPath;
+            var path = _settings.CatalogPath(_projectId);
             var catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(path);
             var isNew = catalog == null;
             if (isNew) catalog = ScriptableObject.CreateInstance<DialogueCatalog>();
@@ -225,12 +255,12 @@ namespace Loreman.Dialogues.Editor
             var languages = manifest.languages.Select(l => l.code).ToList();
             if (!languages.Contains(manifest.baseLanguage)) languages.Insert(0, manifest.baseLanguage);
             catalog.Populate(
-                manifest.projectName, manifest.contentHash, manifest.baseLanguage, languages, manifest.speakers, manifest.groups,
+                _projectId.ToString("D"), manifest.projectName, manifest.contentHash, manifest.baseLanguage, languages, manifest.speakers, manifest.groups,
                 manifest.dialogues.Select(d => new CatalogDialogue { id = d.id, name = d.name, groupId = d.groupId, hash = d.hash, nodes = d.nodes }));
 
             if (isNew) AssetDatabase.CreateAsset(catalog, path);
             else EditorUtility.SetDirty(catalog);
-            RegisterAddressable(path, LoremanNames.CatalogAddress, null);
+            RegisterAddressable(path, LoremanNames.CatalogAddress(_projectId), null, LoremanNames.CatalogLabel);
         }
 
         // ── Unity Localization ──
@@ -278,7 +308,7 @@ namespace Loreman.Dialogues.Editor
         // ── Addressables ──
 
         /// <param name="packSeparately">Sets the bundle mode of the group (null leaves it as it is).</param>
-        private void RegisterAddressable(string assetPath, string address, bool? packSeparately)
+        private void RegisterAddressable(string assetPath, string address, bool? packSeparately, params string[] extraLabels)
         {
             var aa = AddressableAssetSettingsDefaultObject.GetSettings(true);
             var group = aa.FindGroup(_settings.addressablesGroup)
@@ -290,8 +320,11 @@ namespace Loreman.Dialogues.Editor
             var guid = AssetDatabase.AssetPathToGUID(assetPath);
             var entry = aa.CreateOrMoveEntry(guid, group, false, false);
             entry.address = address;
-            aa.AddLabel(LoremanNames.Label, false);
-            entry.SetLabel(LoremanNames.Label, true, false, false);
+            foreach (var label in new[] { LoremanNames.Label }.Concat(extraLabels))
+            {
+                aa.AddLabel(label, false);
+                entry.SetLabel(label, true, false, false);
+            }
             aa.SetDirty(AddressableAssetSettings.ModificationEvent.EntryMoved, entry, true);
         }
     }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- **Builds of different Loreman projects live side by side.** Each build has a catalog of its own (`Catalogs/{project}.asset`, label `loreman.catalog`) and a speakers table of its own; a sync reads, writes and removes only its own project's dialogues. Before, one catalog served the whole Unity project and syncing a second build (for example a sample's demo build) **removed the dialogues of the first**. The first sync after the update removes the old catalog and speakers table and re-syncs each build into its own (dialogue assets are adopted, nothing is lost).
+- API: `DialogueService.Catalog` is now `Catalogs` (all of them) and `Dialogues` (all dialogues); `IAssetLoader.FindAddressesAsync`, `IDialogueTextSource.InitializeAsync(catalogs)` and `GetSpeakerText(projectId, key)`; the dialogue picker, the window and the auto-sync work over all catalogs.
+- **Voice-overs are imported as game audio** (Vorbis 50%, mono, streamed when long): on two real 4–5 minute recordings 8.2 MB → 3.0 MB in the build and about 75 MB less RAM. Settings in the window; applied once per recording.
+- Samples choose their own dialogue (the scene stores its id), so they work in a project that has other builds. Fixed the Canvas sample not compiling in projects that use the new Input System (a method named `Type` hid `System.Type`).
+- Long streamed clips are played as the clip of the source (`DialoguePlayer`, Basic Dialogue), not with `PlayOneShot`.
+
 ## 0.4.0
 
 - **`DialoguePlayer`** component: owns the service, plays a dialogue and its voice-overs, raises `Ready` / `Presented` / `Refreshed` / `Finished` / `Failed`; `Play`, `Advance`, `Choose`, `Stop`. A screen only listens to it.

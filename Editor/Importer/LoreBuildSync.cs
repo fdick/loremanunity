@@ -27,7 +27,9 @@ namespace Loreman.Dialogues.Editor
                 }
                 using (var file = LoreBuildFile.Open(Path.GetFullPath(assetPath)))
                 {
-                    var report = BuildSynchronizer.Run(file, new UnitySyncTarget(settings), force);
+                    if (!Guid.TryParse(file.Manifest.projectId, out var projectId))
+                        throw new DialogueFormatException("The build has no valid project id.");
+                    var report = BuildSynchronizer.Run(file, new UnitySyncTarget(settings, projectId), force);
                     Debug.Log($"{report} ({assetPath})");
                     return report;
                 }
@@ -55,7 +57,7 @@ namespace Loreman.Dialogues.Editor
 
     /// <summary>
     /// A build that was imported together with scripts (a sample, a package update) is imported just before Unity recompiles, and the recompile throws away what was
-    /// queued for later. So after every recompile the project is looked at again, and brought to the newest build if it is not at one (see <see cref="BuildListing.PickToSync"/>).
+    /// queued for later. So after every recompile the project is looked at again, and brought to the newest build if it is not at one (see <see cref="BuildListing.PickToSync"/>): each project's newest build that the project is not at.
     /// </summary>
     internal static class LoreBuildAutoSync
     {
@@ -65,13 +67,8 @@ namespace Loreman.Dialogues.Editor
         internal static void Run()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            var settings = LoremanSettings.GetOrCreate();
-            var catalog = AssetDatabase.LoadAssetAtPath<DialogueCatalog>(settings.CatalogPath);
-            var syncedHash = catalog != null && !string.IsNullOrEmpty(catalog.ContentHash) ? catalog.ContentHash : null;
-            var builds = BuildListing.FindAll(syncedHash);
-            if (builds.Count == 0) return;
-            var pick = BuildListing.PickToSync(builds);
-            if (pick != null) LoreBuildSync.SyncAsset(pick.AssetPath);
+            var builds = BuildListing.FindAll(CatalogLocator.HashesByProject());
+            foreach (var pick in BuildListing.PickToSync(builds)) LoreBuildSync.SyncAsset(pick.AssetPath);
         }
     }
 

@@ -6,7 +6,7 @@ The smallest complete use of the package. **It brings everything it needs**: a s
 2. Unity imports `CityGate.lorebuild` and syncs it by itself (the Console says *Loreman: dialogues synced*; the first time it also makes the Localization Settings and the `en`/`ru` locales). If it does not, use *Tools → Loreman → Window → Sync*.
 3. Open the scene **BasicDialogue** and press **Play**, then **Talk**. Click the language buttons while the guard is talking: the same line is shown again in the other language, and `♪` marks a line with a voice-over (in Russian the second recording is missing on purpose: that line is silent).
 
-To use your own dialogue instead, put your `.lorebuild` into `Assets` and pick the dialogue in the **Dialogue** field of the component (empty = the first dialogue of the catalog).
+To use your own dialogue instead, put your `.lorebuild` into `Assets` and pick the dialogue in the **Dialogue** field of the component (the sample plays its own *City Gate*, whatever other builds the project has; clear the field to play the first dialogue of the project).
 
 What the script shows (the numbered comments in `BasicDialogueExample.cs`):
 

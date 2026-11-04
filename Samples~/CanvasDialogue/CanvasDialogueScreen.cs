@@ -94,14 +94,19 @@ namespace Loreman.Dialogues.Samples.Canvas
             if (FindFirstObjectByType<EventSystem>() != null) return;
             var go = new GameObject("EventSystem", typeof(EventSystem));
 #if ENABLE_INPUT_SYSTEM
-            var module = Type.GetType("UnityEngine.InputSystem.UI.InputSystemUIInputModule, Unity.InputSystem");
+            // The Input System's own module, found by name so that the sample compiles without a reference to that package.
+            var module = System.Type.GetType("UnityEngine.InputSystem.UI.InputSystemUIInputModule, Unity.InputSystem");
             if (module != null)
             {
                 go.AddComponent(module);
                 return;
             }
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
             go.AddComponent<StandaloneInputModule>();
+#else
+            Debug.LogWarning("Loreman sample: the project uses the Input System only, but the package com.unity.inputsystem was not found: the buttons will not react.");
+#endif
         }
 
         // ── events of the player ──
@@ -211,10 +216,10 @@ namespace Loreman.Dialogues.Samples.Canvas
                 return;
             }
             lineLabel.text = string.Empty;
-            _typing = StartCoroutine(Type());
+            _typing = StartCoroutine(TypeOut());
         }
 
-        private IEnumerator Type()
+        private IEnumerator TypeOut()
         {
             var shown = 0f;
             while (shown < _fullText.Length)

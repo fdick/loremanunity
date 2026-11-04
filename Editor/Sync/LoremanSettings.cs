@@ -34,6 +34,21 @@ namespace Loreman.Dialogues.Editor
         [Tooltip("Make the Unity locales that the build has languages for and the project does not. Turn it off to fail instead.")]
         public bool createMissingLocales = true;
 
+        [Header("Voice-overs")]
+        [Tooltip("Import the recordings as compact game audio: Vorbis, mono, long ones streamed. Without it Unity keeps its defaults, which are meant for music and sound effects. Applied once, when a recording is first imported; change a clip's own import settings afterwards and they are kept.")]
+        public bool optimizeVoiceOvers = true;
+
+        [Range(0.05f, 1f)]
+        [Tooltip("Vorbis quality: 0.5 is plenty for speech and about a third of the size of the default 1.0.")]
+        public float voiceQuality = 0.5f;
+
+        [Tooltip("Speech needs one channel: it halves the size of a stereo recording.")]
+        public bool forceMono = true;
+
+        [Tooltip("A recording bigger than this (KB, as it came from Loreman) is streamed from disk when played instead of being kept in memory.")]
+        public int streamLargerThanKB = 500;
+
+        [Header("Languages")]
         [Tooltip("Languages whose Unity locale code is not the obvious one.")]
         public List<LocaleOverride> localeOverrides = new List<LocaleOverride>();
 
@@ -45,7 +60,13 @@ namespace Loreman.Dialogues.Editor
             return map;
         }
 
-        public string CatalogPath => outputFolder.TrimEnd('/') + "/Catalog.asset";
+        /// <summary>The catalogs, one for each Loreman project (builds of different projects live side by side).</summary>
+        public string CatalogsFolder => outputFolder.TrimEnd('/') + "/Catalogs";
+
+        public string CatalogPath(Guid projectId) => CatalogsFolder + "/" + projectId.ToString("N") + ".asset";
+
+        /// <summary>Where the first versions kept their only catalog. The importer removes it.</summary>
+        public string LegacyCatalogPath => outputFolder.TrimEnd('/') + "/Catalog.asset";
 
         public string DialoguePath(Guid id) => outputFolder.TrimEnd('/') + "/Dialogues/" + id.ToString("N") + ".asset";
 
@@ -56,6 +77,17 @@ namespace Loreman.Dialogues.Editor
         public string TablesFolder => outputFolder.TrimEnd('/') + "/Localization";
 
         public string LocalesFolder => outputFolder.TrimEnd('/') + "/Locales";
+
+        /// <summary>The settings of the project, or null when there are none yet (nothing is made).</summary>
+        public static LoremanSettings Find()
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:LoremanSettings"))
+            {
+                var found = AssetDatabase.LoadAssetAtPath<LoremanSettings>(AssetDatabase.GUIDToAssetPath(guid));
+                if (found != null) return found;
+            }
+            return null;
+        }
 
         /// <summary>The settings of the project; made with the defaults when there are none.</summary>
         public static LoremanSettings GetOrCreate()

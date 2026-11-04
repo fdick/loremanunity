@@ -134,7 +134,7 @@ namespace Loreman.Dialogues
         private SpeakerView Speaker(int index)
         {
             if (!_catalog.TryGetSpeaker(index, out var s)) return new SpeakerView(Guid.Empty, string.Empty, string.Empty, Color.white);
-            return new SpeakerView(s.Id, _texts.GetSpeakerText(s.Name), _texts.GetSpeakerText(s.Note), s.Color);
+            return new SpeakerView(s.Id, _texts.GetSpeakerText(_catalog.ProjectGuid, s.Name), _texts.GetSpeakerText(_catalog.ProjectGuid, s.Note), s.Color);
         }
     }
 }

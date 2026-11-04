@@ -11,11 +11,19 @@ namespace Loreman.Dialogues
         /// <summary>The Addressables label of everything the package makes.</summary>
         public const string Label = "loreman";
 
-        /// <summary>The address of the catalog: the small list of dialogues the game loads first.</summary>
-        public const string CatalogAddress = "loreman/catalog";
+        /// <summary>The Addressables label of the catalogs. The game loads every catalog that has it: each build of a Loreman project has one, so builds live side by side.</summary>
+        public const string CatalogLabel = "loreman.catalog";
 
-        /// <summary>The Unity Localization table (collection) that holds the names and descriptions of the speakers.</summary>
-        public const string SpeakersTable = "LoremanSpeakers";
+        /// <summary>The address of the catalog of a project: the small list of its dialogues the game loads first.</summary>
+        public static string CatalogAddress(Guid projectId) => "loreman/catalog/" + projectId.ToString("N");
+
+        /// <summary>The Unity Localization table (collection) that holds the names and descriptions of the speakers of a project.</summary>
+        public static string SpeakersTable(Guid projectId) => "LoremanSpeakers_" + projectId.ToString("N");
+
+        /// <summary>The names the first versions used, when one catalog served the whole Unity project. The importer removes them.</summary>
+        public const string LegacyCatalogAddress = "loreman/catalog";
+
+        public const string LegacySpeakersTable = "LoremanSpeakers";
 
         /// <summary>The Unity Localization asset table (collection) that holds the voice-overs of a dialogue, one clip per language.</summary>
         public static string AudioTable(Guid dialogueId) => "LoremanAudio_" + dialogueId.ToString("N");

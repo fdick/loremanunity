@@ -32,6 +32,7 @@ namespace Loreman.Dialogues
     /// <summary>
     /// Loads dialogue graphs when they are asked for and unloads them when nobody holds them. A dialogue asked for twice is loaded once (even when the second
     /// request comes while the first is still loading) and kept until every lease is disposed. Knows nothing about texts: see <see cref="IDialogueTextSource"/>.
+    /// The dialogues come from every catalog in the project (a catalog for each Loreman build), so the game can use several builds at once.
     /// </summary>
     public sealed class DialogueLibrary : IDisposable
     {
@@ -45,7 +46,10 @@ namespace Loreman.Dialogues
 
         private readonly IAssetLoader _loader;
         private readonly Dictionary<Guid, Entry> _entries = new Dictionary<Guid, Entry>();
-        private DialogueCatalog _catalog;
+        private readonly List<DialogueCatalog> _catalogs = new List<DialogueCatalog>();
+        private readonly Dictionary<Guid, DialogueCatalog> _owner = new Dictionary<Guid, DialogueCatalog>();
+        private readonly List<CatalogDialogue> _dialogues = new List<CatalogDialogue>();
+        private bool _initialized;
         private bool _disposed;
 
         public DialogueLibrary(IAssetLoader loader)
@@ -53,30 +57,53 @@ namespace Loreman.Dialogues
             _loader = loader ?? throw new ArgumentNullException(nameof(loader));
         }
 
-        /// <summary>The catalog, once <see cref="InitializeAsync"/> is done.</summary>
-        public DialogueCatalog Catalog => _catalog;
+        /// <summary>The catalogs, once <see cref="InitializeAsync"/> is done: one for each Loreman build in the project.</summary>
+        public IReadOnlyList<DialogueCatalog> Catalogs => _catalogs;
 
-        public bool IsInitialized => _catalog != null;
+        /// <summary>The dialogues of all the catalogs.</summary>
+        public IReadOnlyList<CatalogDialogue> Dialogues => _dialogues;
+
+        public bool IsInitialized => _initialized;
 
         /// <summary>How many dialogues are loaded now (what the game holds).</summary>
         public int LoadedCount => _entries.Count;
 
         public bool IsLoaded(Guid dialogueId) => _entries.TryGetValue(dialogueId, out var e) && e.Graph != null;
 
-        /// <summary>Loads the catalog. Call it once, before anything else.</summary>
+        /// <summary>The catalog a dialogue is in (null when no catalog has it).</summary>
+        public DialogueCatalog CatalogOf(Guid dialogueId) => _owner.TryGetValue(dialogueId, out var catalog) ? catalog : null;
+
+        /// <summary>Loads the catalogs. Call it once, before anything else.</summary>
         public async Task InitializeAsync(CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
-            if (_catalog != null) return;
-            _catalog = await _loader.LoadAsync<DialogueCatalog>(LoremanNames.CatalogAddress, cancellationToken);
+            if (_initialized) return;
+
+            var addresses = await _loader.FindAddressesAsync(LoremanNames.CatalogLabel, cancellationToken);
+            if (addresses.Count == 0)
+                throw new InvalidOperationException("Loreman: no catalog found. Is a .lorebuild file imported and synced (Tools → Loreman → Window), and Addressables built?");
+
+            foreach (var address in addresses)
+            {
+                var catalog = await _loader.LoadAsync<DialogueCatalog>(address, cancellationToken);
+                _catalogs.Add(catalog);
+                foreach (var dialogue in catalog.Dialogues)
+                {
+                    var id = dialogue.Guid;
+                    if (id == Guid.Empty || _owner.ContainsKey(id)) continue; // the same dialogue in two builds: the first catalog has it
+                    _owner[id] = catalog;
+                    _dialogues.Add(dialogue);
+                }
+            }
+            _initialized = true;
         }
 
         /// <summary>Loads a dialogue (or takes the one that is already loaded) and holds it until the lease is disposed.</summary>
         public async Task<DialogueLease> AcquireAsync(Guid dialogueId, CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
-            if (_catalog == null) throw new InvalidOperationException("Loreman: the library is not initialized. Await InitializeAsync first.");
-            if (!_catalog.TryGetDialogue(dialogueId, out _)) throw new KeyNotFoundException($"Loreman: the build has no dialogue {dialogueId}.");
+            if (!_initialized) throw new InvalidOperationException("Loreman: the library is not initialized. Await InitializeAsync first.");
+            if (!_owner.ContainsKey(dialogueId)) throw new KeyNotFoundException($"Loreman: the build has no dialogue {dialogueId}.");
 
             if (!_entries.TryGetValue(dialogueId, out var entry))
             {
@@ -137,8 +164,11 @@ namespace Loreman.Dialogues
             foreach (var entry in _entries.Values)
                 if (entry.Asset != null) _loader.Release(entry.Asset);
             _entries.Clear();
-            if (_catalog != null) _loader.Release(_catalog);
-            _catalog = null;
+            foreach (var catalog in _catalogs) _loader.Release(catalog);
+            _catalogs.Clear();
+            _owner.Clear();
+            _dialogues.Clear();
+            _initialized = false;
         }
 
         private void ThrowIfDisposed()

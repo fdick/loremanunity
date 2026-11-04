@@ -23,6 +23,18 @@ namespace Loreman.Dialogues.Tests
 
         public static LoreBuildFile Open() => LoreBuildFile.Open(Path);
 
+        /// <summary>A build of another Loreman project (the demo build of the samples: "City Gate"). It lives beside <see cref="Open"/>'s, never replaces it.</summary>
+        public static string OtherPath
+        {
+            get
+            {
+                var info = PackageInfo.FindForAssembly(typeof(SampleBuild).Assembly);
+                return System.IO.Path.Combine(info.resolvedPath, "Tests", "Fixtures", "other.lorebuild");
+            }
+        }
+
+        public static LoreBuildFile OpenOther() => LoreBuildFile.Open(OtherPath);
+
         public static byte[] Bytes() => File.ReadAllBytes(Path);
 
         public static ManifestDialogue Gate(BuildManifest manifest) => manifest.dialogues.Single(d => d.name == "Gate");

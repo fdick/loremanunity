@@ -20,10 +20,10 @@ Package Manager → Add package from git URL (or *from disk*). It depends on `co
 1. In Loreman, on the project list, press the hammer on the project (or right click → *Build for the game*). A `my-game.lorebuild` file is saved.
 2. Put it anywhere under `Assets/` of the Unity project (or use the window above). Replacing it later is enough: **it is synced when it is imported**, and again after a recompile if the project is not at a build yet (or use *Tools → Loreman → Sync All Builds*). The first sync also makes the *Localization Settings* asset when the project has none.
 3. The importer makes, in `Assets/Loreman/Generated` (settings: *Tools → Loreman → Settings*), only what changed:
-   - `Catalog.asset` — the small list of dialogues, speakers and languages (Addressable `loreman/catalog`);
+   - `Catalogs/{project}.asset` — the small list of dialogues, speakers and languages of **one Loreman project** (Addressable `loreman/catalog/{project}`, label `loreman.catalog`). Every build has a catalog of its own, so **builds of different projects live side by side** (your game's build and the samples' demo build, say); syncing one never touches the other. Two files of the same project replace each other;
    - `Dialogues/{id}.asset` — one graph per dialogue (Addressable `loreman/dialogues/{id}`, a bundle of its own);
    - one Unity Localization **string table per dialogue** (`LoremanDialogue_{id}`) and one for the speakers (`LoremanSpeakers`), with the Unity locales the project lacks;
-   - the **voice-overs**: the recordings are imported as `AudioClip`s under `Audio/{dialogue}/{language}/` and put in one Localization **asset table per dialogue** (`LoremanAudio_{id}`), a clip per language.
+   - the **voice-overs**: the recordings are imported as `AudioClip`s under `Audio/{dialogue}/{language}/` and put in one Localization **asset table per dialogue** (`LoremanAudio_{id}`), a clip per language. They are imported as **game audio**, not as music: Vorbis, mono, quality 0.5, and streamed from disk when long (see *Size* below).
 4. Build Addressables as you do for the rest of the game (*Build Addressables on Player Build* is on by default in Addressables 2.x).
 
 Do not edit the generated assets: they are remade from the build. Commit them with the rest of the project (or generate them in CI with *Sync All Builds*).
@@ -83,6 +83,19 @@ In the inspector, a field of type `DialogueReference` is a button with the name 
 `dialogues.PreloadAsync(id)` loads a dialogue ahead of time and keeps it until the handle is disposed. `view.Note` is the designer's note exactly as typed in
 Loreman (conditions, effects…): the package does not read it, your game may. `view.NodeId` can be saved and passed to `talk.JumpTo(id)` to carry on later.
 
+## Size
+
+A `.lorebuild` is a transport file: the voice-overs go into it as they were uploaded to Loreman (an mp3 is already compressed, so zipping does not help), so a project with a few long recordings gives a big file. **The game is smaller:** when the importer imports a recording it sets Unity's audio import settings for speech (*Tools → Loreman → Window → Settings*, section Voice-overs; applied once per recording, and a change you make to a clip's own import settings afterwards is kept):
+
+| | Unity's defaults | Loreman (default settings) |
+|---|---|---|
+| Format | Vorbis, quality 100% | Vorbis, quality 50% |
+| Channels | as recorded (stereo) | mono |
+| Load type | *Decompress On Load*: the whole clip is unpacked into RAM | *Streaming* above 500 KB, else *Compressed In Memory* |
+| Two real test recordings (4 and 5 minutes) | 8.2 MB in the build, ~75 MB of RAM when played | **3.0 MB** in the build, almost no RAM |
+
+Only the dialogues the game plays are loaded, and a clip is loaded when its line is about to be said.
+
 ## Samples
 
 *Package Manager → Loreman Dialogues → Samples → Import.* Each sample is **self-contained**: it brings a scene you open and play at once, its script, and a small demo build (`CityGate.lorebuild`, English and Russian, a few voice-overs) that is synced when it is imported.
@@ -101,8 +114,8 @@ Each has a README next to its script. The first two draw with `OnGUI` so that th
 | Assembly | Knows | Holds |
 |---|---|---|
 | `Loreman.Dialogues.Core` | no Unity at all | the binary readers, the graph model, `DialogueSession` (the state machine), `LoremanNames` |
-| `Loreman.Dialogues.Runtime` | Unity, Addressables, Localization | `DialogueLibrary` (loading, reference counting), `IAssetLoader`/`IDialogueTextSource`/`IDialogueAudioSource` and their Addressables/Localization implementations, `DialogueConversation`, `DialogueService`, `DialogueReference` |
-| `Loreman.Dialogues.Editor` | the editor | `.lorebuild` reader, `SyncPlan`, `BuildSynchronizer` (the rules), `UnitySyncTarget` (the writes), importer, auto-sync, `LoremanCli`, the window (`SettingsValidator`, `LanguageRows`, `BuildListing` decide; `LoremanWindow` draws) |
+| `Loreman.Dialogues.Runtime` | Unity, Addressables, Localization | `DialogueLibrary` (loads every catalog; loading, reference counting), `IAssetLoader`/`IDialogueTextSource`/`IDialogueAudioSource` and their Addressables/Localization implementations, `DialogueConversation`, `DialogueService`, `DialogueReference` |
+| `Loreman.Dialogues.Editor` | the editor | `.lorebuild` reader, `SyncPlan`, `BuildSynchronizer` (the rules), `UnitySyncTarget` (the writes, scoped to one project), voice-over import settings, importer, auto-sync, `LoremanCli`, the window (`SettingsValidator`, `LanguageRows`, `BuildListing` decide; `LoremanWindow` draws) |
 
 Everything the game touches in the outside world goes through a small interface (`IAssetLoader`, `IDialogueTextSource`, `IDialogueAudioSource`, `ISyncTarget`), so each part is tested with
 a fake. The file format is described in [Documentation~/BUILD_FORMAT.md](Documentation~/BUILD_FORMAT.md). Tests: *Window → General → Test Runner → EditMode*

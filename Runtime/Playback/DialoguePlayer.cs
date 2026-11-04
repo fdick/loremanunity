@@ -61,8 +61,8 @@ namespace Loreman.Dialogues
 
         public DialogueService Service => _service;
 
-        /// <summary>The dialogues of the catalog (empty until <see cref="Ready"/>).</summary>
-        public IReadOnlyList<CatalogDialogue> Dialogues => IsReady ? _service.Catalog.Dialogues : Array.Empty<CatalogDialogue>();
+        /// <summary>The dialogues of all the builds in the project (empty until <see cref="Ready"/>).</summary>
+        public IReadOnlyList<CatalogDialogue> Dialogues => IsReady ? _service.Dialogues : Array.Empty<CatalogDialogue>();
 
         /// <summary>
         /// Plays with a service of your own (a game that shares one service, a test). Call it before the player starts; the service is not disposed by the player.
@@ -217,7 +217,8 @@ namespace Loreman.Dialogues
                 var clip = await talk.LoadAudioAsync(view, -1, _lifetime.Token);
                 if (clip == null || _talk != talk || talk.Current != view) return; // silent in this language, or the line has changed meanwhile
                 if (voice == null) voice = gameObject.AddComponent<AudioSource>();
-                voice.PlayOneShot(clip);
+                voice.clip = clip; // a long recording is streamed, and a streamed clip is played as the clip of the source
+                voice.Play();
             }
             catch (OperationCanceledException) { }
             catch (Exception e)

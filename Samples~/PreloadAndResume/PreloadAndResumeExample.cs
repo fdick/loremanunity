@@ -27,7 +27,7 @@ namespace Loreman.Dialogues.Samples
         private string _status = "Loading…";
         private string _note = string.Empty;
 
-        private Guid DialogueId => dialogue.IsSet ? dialogue.Guid : _service.Catalog.Dialogues[0].Guid;
+        private Guid DialogueId => dialogue.IsSet ? dialogue.Guid : _service.Dialogues[0].Guid;
 
         private async void Start()
         {
@@ -122,7 +122,7 @@ namespace Loreman.Dialogues.Samples
             GUILayout.Label("<b>Loreman Dialogues — Preload and Resume</b>");
             GUILayout.Label(_status);
 
-            if (_service != null && _service.IsInitialized && _service.Catalog.Dialogues.Count > 0 && _talk == null)
+            if (_service != null && _service.IsInitialized && _service.Dialogues.Count > 0 && _talk == null)
             {
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button("Preload")) Preload();

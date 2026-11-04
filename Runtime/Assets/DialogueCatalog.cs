@@ -61,6 +61,7 @@ namespace Loreman.Dialogues
     /// </summary>
     public sealed class DialogueCatalog : ScriptableObject
     {
+        [SerializeField] private string projectId;
         [SerializeField] private string projectName;
         [SerializeField] private string contentHash;
         [SerializeField] private string baseLanguage;
@@ -70,6 +71,9 @@ namespace Loreman.Dialogues
         [SerializeField] private List<CatalogDialogue> dialogues = new List<CatalogDialogue>();
 
         [NonSerialized] private Dictionary<Guid, CatalogDialogue> _index;
+
+        /// <summary>The id of the Loreman project this catalog was made from. Builds of different projects have catalogs of their own.</summary>
+        public Guid ProjectGuid => Guid.TryParse(projectId, out var guid) ? guid : Guid.Empty;
 
         public string ProjectName => projectName;
 
@@ -114,9 +118,10 @@ namespace Loreman.Dialogues
 
         /// <summary>Fills the catalog. Called by the importer.</summary>
         public void Populate(
-            string project, string hash, string baseCode, IEnumerable<string> languageCodes,
+            string projectGuid, string project, string hash, string baseCode, IEnumerable<string> languageCodes,
             IEnumerable<CatalogSpeaker> speakerList, IEnumerable<CatalogGroup> groupList, IEnumerable<CatalogDialogue> dialogueList)
         {
+            projectId = projectGuid;
             projectName = project;
             contentHash = hash;
             baseLanguage = baseCode;

@@ -13,4 +13,4 @@ How it is built:
 - It makes an `EventSystem` if the scene has none, with the input module that fits your project (the new Input System or the old Input Manager).
 - The labels are the legacy `Text`, so the sample needs nothing but uGUI. With TextMeshPro change the fields to `TMP_Text`; the rest stays.
 
-To use your own dialogue: put your `.lorebuild` into `Assets` and pick the dialogue on the *Dialogue Player* (empty = the first dialogue of the catalog).
+To use your own dialogue: put your `.lorebuild` into `Assets` and pick the dialogue on the *Dialogue Player* (the sample plays its own *City Gate*, whatever other builds the project has; clear the field to play the first dialogue of the project).

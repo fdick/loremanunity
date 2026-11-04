@@ -25,6 +25,9 @@ namespace Loreman.Dialogues.Tests
             return (T)asset;
         }
 
+        public Task<IReadOnlyList<string>> FindAddressesAsync(string label, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>(label == LoremanNames.CatalogLabel ? Assets.Keys.Where(k => k.StartsWith("loreman/catalog/")).OrderBy(k => k).ToList() : new List<string>());
+
         public void Release(Object asset) => Released.Add(asset);
     }
 
@@ -36,11 +39,11 @@ namespace Loreman.Dialogues.Tests
         public int Prepared;
         public event Action TextsChanged;
 
-        public Task InitializeAsync(DialogueCatalog catalog, CancellationToken cancellationToken) { Calls.Add("init"); return Task.CompletedTask; }
+        public Task InitializeAsync(IReadOnlyList<DialogueCatalog> catalogs, CancellationToken cancellationToken) { Calls.Add("init"); return Task.CompletedTask; }
         public Task PrepareAsync(Guid dialogueId, CancellationToken cancellationToken) { Prepared++; Calls.Add("prepare"); return Task.CompletedTask; }
         public void Release(Guid dialogueId) { Prepared--; Calls.Add("release"); }
         public string GetText(Guid dialogueId, TextKey key) => Texts.TryGetValue(key.Id, out var t) ? t : "";
-        public string GetSpeakerText(TextKey key) => Speakers.TryGetValue(key.Id, out var t) ? t : "";
+        public string GetSpeakerText(Guid projectId, TextKey key) => Speakers.TryGetValue(key.Id, out var t) ? t : "";
         public void Dispose() { }
         public void Change() => TextsChanged?.Invoke();
     }
@@ -61,6 +64,7 @@ namespace Loreman.Dialogues.Tests
     {
         private readonly List<Object> _made = new List<Object>();
         private Guid _id;
+        private Guid _projectId;
         private FakeLoader _loader;
         private FakeTexts _texts;
         private FakeAudio _audio;
@@ -91,7 +95,8 @@ namespace Loreman.Dialogues.Tests
             using (var file = SampleBuild.Open())
             {
                 var m = file.Manifest;
-                catalog.Populate(m.projectName, m.contentHash, m.baseLanguage, new[] { "en" }, m.speakers, m.groups,
+                _projectId = Guid.Parse(m.projectId);
+                catalog.Populate(m.projectId, m.projectName, m.contentHash, m.baseLanguage, new[] { "en" }, m.speakers, m.groups,
                     m.dialogues.Select(d => new CatalogDialogue { id = d.id, name = d.name, hash = d.hash, nodes = d.nodes }));
                 _texts.Speakers[m.speakers[dialogue.Nodes[0].Speaker].nameKey] = "Guard";
                 _texts.Speakers[m.speakers[dialogue.Nodes[1].AnswerSpeaker].nameKey] = "Hero";
@@ -102,7 +107,7 @@ namespace Loreman.Dialogues.Tests
             _texts.Texts[dialogue.Nodes[1].Options[1].Text.Id] = "Never";
             _texts.Texts[dialogue.Nodes[2].Text.Id] = "Move along.";
 
-            _loader.Assets[LoremanNames.CatalogAddress] = catalog;
+            _loader.Assets[LoremanNames.CatalogAddress(_projectId)] = catalog;
             _loader.Assets[LoremanNames.DialogueAddress(_id)] = asset;
             _made.Add(asset);
             _made.Add(catalog);
@@ -149,7 +154,7 @@ namespace Loreman.Dialogues.Tests
             var library = new DialogueLibrary(_loader);
             Run(library.InitializeAsync(CancellationToken.None));
             Assert.AreEqual(0, library.LoadedCount);
-            CollectionAssert.AreEqual(new[] { LoremanNames.CatalogAddress }, _loader.Loads);
+            CollectionAssert.AreEqual(new[] { LoremanNames.CatalogAddress(_projectId) }, _loader.Loads);
 
             var a = Run(library.AcquireAsync(_id, CancellationToken.None));
             var b = Run(library.AcquireAsync(_id, CancellationToken.None));
@@ -222,6 +227,47 @@ namespace Loreman.Dialogues.Tests
             Run(library.AcquireAsync(_id, CancellationToken.None));
             library.Dispose();
             Assert.AreEqual(2, _loader.Released.Count); // the dialogue and the catalog
+        }
+
+        // ── several builds ──
+
+        [Test]
+        public void The_dialogues_of_every_catalog_are_listed_and_each_belongs_to_its_catalog()
+        {
+            // a second build of another project, with a dialogue of its own
+            var otherProject = Guid.NewGuid();
+            var plainId = new Guid("11111111-2222-3333-4444-555555555555");
+            var plainAsset = ScriptableObject.CreateInstance<DialogueAsset>();
+            plainAsset.Populate(plainId, "h", NoAudioGraph());
+            var other = ScriptableObject.CreateInstance<DialogueCatalog>();
+            other.Populate(otherProject.ToString("D"), "Other", "h2", "ru", new[] { "ru" }, new CatalogSpeaker[0], new CatalogGroup[0],
+                new[] { new CatalogDialogue { id = plainId.ToString("D"), name = "Plain" } });
+            _made.Add(plainAsset);
+            _made.Add(other);
+            _loader.Assets[LoremanNames.CatalogAddress(otherProject)] = other;
+            _loader.Assets[LoremanNames.DialogueAddress(plainId)] = plainAsset;
+
+            var library = new DialogueLibrary(_loader);
+            Run(library.InitializeAsync(CancellationToken.None));
+
+            Assert.AreEqual(2, library.Catalogs.Count);
+            Assert.AreEqual(2, library.Dialogues.Count);
+            Assert.AreEqual(_projectId, library.CatalogOf(_id).ProjectGuid);
+            Assert.AreEqual(otherProject, library.CatalogOf(plainId).ProjectGuid);
+            Assert.IsNull(library.CatalogOf(Guid.NewGuid()));
+
+            // both play, each with its own catalog
+            Run(library.AcquireAsync(_id, CancellationToken.None)).Dispose();
+            Run(library.AcquireAsync(plainId, CancellationToken.None)).Dispose();
+        }
+
+        [Test]
+        public void With_no_catalog_at_all_the_library_says_what_to_do()
+        {
+            _loader.Assets.Remove(LoremanNames.CatalogAddress(_projectId));
+            var library = new DialogueLibrary(_loader);
+            var e = Assert.Throws<InvalidOperationException>(() => Run(library.InitializeAsync(CancellationToken.None)));
+            StringAssert.Contains("no catalog", e.Message);
         }
 
         // ── service and conversation ──
@@ -349,8 +395,8 @@ namespace Loreman.Dialogues.Tests
             asset.Populate(plain.Id, "h", NoAudioGraph());
             _made.Add(asset);
             _loader.Assets[LoremanNames.DialogueAddress(plain.Id)] = asset;
-            var catalog = (DialogueCatalog)_loader.Assets[LoremanNames.CatalogAddress];
-            catalog.Populate("p", "h", "en", new[] { "en" }, new CatalogSpeaker[0], new CatalogGroup[0], new[] { new CatalogDialogue { id = plain.Id.ToString("D"), name = "plain" } });
+            var catalog = (DialogueCatalog)_loader.Assets[LoremanNames.CatalogAddress(_projectId)];
+            catalog.Populate(_projectId.ToString("D"), "p", "h", "en", new[] { "en" }, new CatalogSpeaker[0], new CatalogGroup[0], new[] { new CatalogDialogue { id = plain.Id.ToString("D"), name = "plain" } });
 
             var service = Service();
             using (Run(service.StartAsync(plain.Id))) { }
