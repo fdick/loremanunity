@@ -45,12 +45,26 @@ namespace Loreman.Dialogues.Tests
         public void Change() => TextsChanged?.Invoke();
     }
 
+    internal sealed class FakeAudio : IDialogueAudioSource
+    {
+        public readonly Dictionary<long, AudioClip> Clips = new Dictionary<long, AudioClip>();
+        public readonly List<string> Calls = new List<string>();
+        public int Prepared;
+
+        public Task PrepareAsync(Guid dialogueId, CancellationToken cancellationToken) { Prepared++; Calls.Add("prepare"); return Task.CompletedTask; }
+        public void Release(Guid dialogueId) { Prepared--; Calls.Add("release"); }
+        public Task<AudioClip> LoadClipAsync(Guid dialogueId, TextKey key, CancellationToken cancellationToken) { Calls.Add("load " + key.Id); return Task.FromResult(Clips.TryGetValue(key.Id, out var c) ? c : null); }
+        public void Dispose() { }
+    }
+
     public class PlaybackTests
     {
         private readonly List<Object> _made = new List<Object>();
         private Guid _id;
         private FakeLoader _loader;
         private FakeTexts _texts;
+        private FakeAudio _audio;
+        private DialogueGraph _graph;
 
         [SetUp]
         public void SetUp()
@@ -58,13 +72,18 @@ namespace Loreman.Dialogues.Tests
             _id = Guid.NewGuid();
             _loader = new FakeLoader();
             _texts = new FakeTexts();
+            _audio = new FakeAudio();
 
             // line (Guard) → choice (answers: "Yes" → end, "No" → end)
             byte[] graph;
             using (var file = SampleBuild.Open())
                 graph = file.Read(SampleBuild.Gate(file.Manifest).graph);
             var dialogue = DialogueGraphReader.Read(graph);
+            _graph = dialogue;
             _id = dialogue.Id;
+            var clip = AudioClip.Create("voice", 100, 1, 8000, false);
+            _made.Add(clip);
+            _audio.Clips[dialogue.Nodes[0].Audio.Id] = clip;
 
             var asset = ScriptableObject.CreateInstance<DialogueAsset>();
             asset.Populate(_id, "h", graph);
@@ -117,7 +136,7 @@ namespace Loreman.Dialogues.Tests
 
         private DialogueService Service()
         {
-            var s = new DialogueService(_loader, _texts);
+            var s = new DialogueService(_loader, _texts, _audio);
             Run(s.InitializeAsync());
             return s;
         }
@@ -283,6 +302,74 @@ namespace Loreman.Dialogues.Tests
             Assert.AreEqual(1, service.LoadedCount); // the preload still holds it
             handle.Dispose();
             Assert.AreEqual(0, service.LoadedCount);
+        }
+
+        // ── voice-overs ──
+
+        [Test]
+        public void A_line_with_a_voice_over_says_so_and_its_clip_is_loaded_only_when_asked_for()
+        {
+            var service = Service();
+            using (var talk = Run(service.StartAsync(_id)))
+            {
+                talk.Start();
+                Assert.IsTrue(talk.Current.HasAudio);
+                Assert.AreEqual(1, _audio.Prepared); // ready, but no clip loaded yet
+                CollectionAssert.DoesNotContain(_audio.Calls, "load " + _graph.Nodes[0].Audio.Id);
+
+                var clip = Run(talk.LoadAudioAsync(talk.Current));
+                Assert.AreSame(_audio.Clips[_graph.Nodes[0].Audio.Id], clip);
+
+                talk.Advance();
+                Assert.IsFalse(talk.Current.HasAudio);
+                Assert.IsNull(Run(talk.LoadAudioAsync(talk.Current))); // the question has none
+                Assert.IsTrue(talk.Current.Options[0].HasAudio);
+                Assert.IsFalse(talk.Current.Options[1].HasAudio);
+                Assert.IsNull(Run(talk.LoadAudioAsync(talk.Current, 1)));
+                Assert.Throws<ArgumentOutOfRangeException>(() => Run(talk.LoadAudioAsync(talk.Current, 5)));
+            }
+        }
+
+        [Test]
+        public void The_voice_overs_are_let_go_with_the_conversation()
+        {
+            var service = Service();
+            var talk = Run(service.StartAsync(_id));
+            Assert.AreEqual(1, _audio.Prepared);
+            talk.Dispose();
+            Assert.AreEqual(0, _audio.Prepared);
+            Assert.IsNull(Run(talk.LoadAudioAsync(new DialogueView(Guid.NewGuid(), false, default, default, "", "", "", null)))); // after the end: nothing, no error
+        }
+
+        [Test]
+        public void A_dialogue_without_any_voice_over_never_asks_for_an_audio_table()
+        {
+            var plain = DialogueGraphReader.Read(NoAudioGraph());
+            var asset = ScriptableObject.CreateInstance<DialogueAsset>();
+            asset.Populate(plain.Id, "h", NoAudioGraph());
+            _made.Add(asset);
+            _loader.Assets[LoremanNames.DialogueAddress(plain.Id)] = asset;
+            var catalog = (DialogueCatalog)_loader.Assets[LoremanNames.CatalogAddress];
+            catalog.Populate("p", "h", "en", new[] { "en" }, new CatalogSpeaker[0], new CatalogGroup[0], new[] { new CatalogDialogue { id = plain.Id.ToString("D"), name = "plain" } });
+
+            var service = Service();
+            using (Run(service.StartAsync(plain.Id))) { }
+            CollectionAssert.IsEmpty(_audio.Calls);
+        }
+
+        private static byte[] NoAudioGraph() =>
+            new byte[] { (byte)'L', (byte)'D', (byte)'L', (byte)'G', 2 }.Concat(new Guid("11111111-2222-3333-4444-555555555555").ToByteArray()).Concat(new byte[] { 0, 0 }).ToArray();
+
+        [Test]
+        public void A_service_without_an_audio_source_plays_without_voice()
+        {
+            var service = new DialogueService(_loader, _texts);
+            Run(service.InitializeAsync());
+            using (var talk = Run(service.StartAsync(_id)))
+            {
+                talk.Start();
+                Assert.IsNull(Run(talk.LoadAudioAsync(talk.Current)));
+            }
         }
 
         [Test]

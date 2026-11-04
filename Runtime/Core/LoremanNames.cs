@@ -17,6 +17,9 @@ namespace Loreman.Dialogues
         /// <summary>The Unity Localization table (collection) that holds the names and descriptions of the speakers.</summary>
         public const string SpeakersTable = "LoremanSpeakers";
 
+        /// <summary>The Unity Localization asset table (collection) that holds the voice-overs of a dialogue, one clip per language.</summary>
+        public static string AudioTable(Guid dialogueId) => "LoremanAudio_" + dialogueId.ToString("N");
+
         /// <summary>The address of the graph of a dialogue.</summary>
         public static string DialogueAddress(Guid dialogueId) => "loreman/dialogues/" + dialogueId.ToString("N");
 

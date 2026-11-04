@@ -14,7 +14,7 @@ namespace Loreman.Dialogues.Editor
         public const string FormatName = "loreman.build";
 
         /// <summary>The newest version of the file this package reads.</summary>
-        public const int SupportedVersion = 1;
+        public const int SupportedVersion = 2;
 
         private readonly ZipArchive _zip;
 

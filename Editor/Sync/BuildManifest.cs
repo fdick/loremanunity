@@ -15,6 +15,21 @@ namespace Loreman.Dialogues.Editor
     }
 
     [Serializable]
+    public sealed class ManifestAudio
+    {
+        /// <summary>The id of the line or of the answer the voice-over belongs to.</summary>
+        public string id;
+
+        /// <summary>The key id of the voice-over in the audio table.</summary>
+        public long key;
+
+        public string language;
+        public string path;
+
+        public Guid Guid => Guid.TryParse(id, out var guid) ? guid : Guid.Empty;
+    }
+
+    [Serializable]
     public sealed class ManifestDialogue
     {
         public string id;
@@ -24,6 +39,7 @@ namespace Loreman.Dialogues.Editor
         public string hash;
         public int nodes;
         public int texts;
+        public List<ManifestAudio> audio = new List<ManifestAudio>();
 
         public Guid Guid => Guid.TryParse(id, out var guid) ? guid : Guid.Empty;
     }

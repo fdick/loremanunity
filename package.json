@@ -1,6 +1,6 @@
 {
-  "name": "com.loreman.dialogues",
-  "version": "0.1.0",
+  "name": "com.loreman.unity",
+  "version": "0.2.0",
   "displayName": "Loreman Dialogues",
   "description": "Plays the dialogues of a Loreman project in Unity. A .lorebuild file made by Loreman is turned into Addressables and Unity Localization tables, so a dialogue and its texts are loaded only when the game needs them.",
   "unity": "6000.3",
@@ -15,5 +15,17 @@
   "dependencies": {
     "com.unity.addressables": "2.8.1",
     "com.unity.localization": "1.5.13"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Basic Dialogue",
+      "description": "Start a dialogue, show lines and choices, play the voice-over, switch the language while it runs.",
+      "path": "Samples~/BasicDialogue"
+    },
+    {
+      "displayName": "Preload and Resume",
+      "description": "Preload a dialogue ahead of time, save the place in it and resume later, read the designer's note of a line.",
+      "path": "Samples~/PreloadAndResume"
+    }
+  ]
 }

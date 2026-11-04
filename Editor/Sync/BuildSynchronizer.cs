@@ -3,6 +3,33 @@ using System.Collections.Generic;
 
 namespace Loreman.Dialogues.Editor
 {
+    /// <summary>A voice-over of a dialogue: whose it is, the language, and a way to read the recording (read only when it is written, so a big build is not held in memory).</summary>
+    public sealed class SyncAudioFile
+    {
+        public SyncAudioFile(Guid id, long key, string language, string extension, Func<byte[]> read)
+        {
+            Id = id;
+            Key = key;
+            Language = language;
+            Extension = extension;
+            Read = read;
+        }
+
+        /// <summary>The id of the line or the answer.</summary>
+        public Guid Id { get; }
+
+        /// <summary>The key id in the audio table.</summary>
+        public long Key { get; }
+
+        /// <summary>The language in the build's spelling (<c>pt-br</c>).</summary>
+        public string Language { get; }
+
+        /// <summary>The file extension without the dot: mp3, wav, ogg, m4a.</summary>
+        public string Extension { get; }
+
+        public Func<byte[]> Read { get; }
+    }
+
     /// <summary>Where a sync puts what it reads from a build. <see cref="UnitySyncTarget"/> writes assets, Addressables entries and Localization tables; a test can put a fake.</summary>
     public interface ISyncTarget
     {
@@ -21,7 +48,8 @@ namespace Loreman.Dialogues.Editor
         void EnsureLocales(IReadOnlyList<string> languages);
 
         /// <param name="texts">The texts of the dialogue by language (a language the dialogue has no text in is missing).</param>
-        void WriteDialogue(ManifestDialogue dialogue, byte[] graph, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts);
+        /// <param name="audio">The voice-overs of the dialogue (empty when it has none). Whatever the project had of this dialogue's audio before is replaced.</param>
+        void WriteDialogue(ManifestDialogue dialogue, byte[] graph, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts, IReadOnlyList<SyncAudioFile> audio);
 
         void RemoveDialogue(Guid dialogueId);
 
@@ -78,12 +106,19 @@ namespace Loreman.Dialogues.Editor
             }
 
             // Everything is read and checked before the first file is written: a damaged build changes nothing.
-            var work = new List<(ManifestDialogue Dialogue, byte[] Graph, Dictionary<string, IReadOnlyList<StringTableEntry>> Texts)>();
+            var work = new List<(ManifestDialogue Dialogue, byte[] Graph, Dictionary<string, IReadOnlyList<StringTableEntry>> Texts, List<SyncAudioFile> Audio)>();
             foreach (var d in force ? PlanAll(manifest) : plan.ToWrite)
             {
                 var graph = file.Read(string.IsNullOrEmpty(d.graph) ? LoreBuildFile.GraphPath(d.Guid) : d.graph);
                 DialogueGraphReader.Read(graph);
-                work.Add((d, graph, ReadTexts(file, languages, l => LoreBuildFile.TextsPath(l, d.Guid))));
+                var audio = new List<SyncAudioFile>();
+                foreach (var a in d.audio)
+                {
+                    if (!file.Has(a.path)) throw new DialogueFormatException("The build has no part \"" + a.path + "\".");
+                    var path = a.path;
+                    audio.Add(new SyncAudioFile(a.Guid, a.key, a.language, System.IO.Path.GetExtension(path).TrimStart('.'), () => file.Read(path)));
+                }
+                work.Add((d, graph, ReadTexts(file, languages, l => LoreBuildFile.TextsPath(l, d.Guid)), audio));
             }
             var speakers = ReadTexts(file, languages, LoreBuildFile.SpeakerTextsPath);
 
@@ -91,7 +126,7 @@ namespace Loreman.Dialogues.Editor
             try
             {
                 target.EnsureLocales(languages);
-                foreach (var w in work) target.WriteDialogue(w.Dialogue, w.Graph, w.Texts);
+                foreach (var w in work) target.WriteDialogue(w.Dialogue, w.Graph, w.Texts, w.Audio);
                 foreach (var id in plan.ToRemove) target.RemoveDialogue(id);
                 target.WriteSpeakers(speakers);
                 target.WriteCatalog(manifest);

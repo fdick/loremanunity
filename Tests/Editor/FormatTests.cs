@@ -14,7 +14,7 @@ namespace Loreman.Dialogues.Tests
             {
                 var m = file.Manifest;
                 Assert.AreEqual("loreman.build", m.format);
-                Assert.AreEqual(1, m.formatVersion);
+                Assert.AreEqual(2, m.formatVersion);
                 Assert.AreEqual("My Game!", m.projectName);
                 Assert.AreEqual("en", m.baseLanguage);
                 CollectionAssert.AreEquivalent(new[] { "en", "ru", "de" }, m.languages.Select(l => l.code));
@@ -58,6 +58,38 @@ namespace Loreman.Dialogues.Tests
                 Assert.AreSame(bye, found);
                 Assert.IsFalse(g.TryGetNode(Guid.NewGuid(), out _));
             }
+        }
+
+        [Test]
+        public void The_graph_says_which_line_and_which_answer_have_a_voice_over()
+        {
+            using (var file = SampleBuild.Open())
+            {
+                var g = SampleBuild.GateGraph(file);
+                Assert.IsTrue(g.HasAudio);
+                Assert.IsTrue(g.Nodes[0].HasAudio); // the guard's line
+                Assert.IsFalse(g.Nodes[1].HasAudio); // the question
+                Assert.IsTrue(g.Nodes[1].Options[0].HasAudio); // "Of course"
+                Assert.IsFalse(g.Nodes[1].Options[1].HasAudio); // "Never"
+                Assert.IsFalse(g.Nodes[2].HasAudio);
+
+                var gate = SampleBuild.Gate(file.Manifest);
+                Assert.AreEqual(3, gate.audio.Count);
+                var forLine = gate.audio.Where(a => a.Guid == g.Nodes[0].Id).ToList();
+                CollectionAssert.AreEquivalent(new[] { "en", "ru" }, forLine.Select(a => a.language));
+                Assert.IsTrue(forLine.All(a => a.key == g.Nodes[0].Audio.Id)); // the graph and the manifest name the voice-over by the same number
+                Assert.IsTrue(file.Has(forLine[0].path));
+            }
+        }
+
+        [Test]
+        public void A_graph_of_version_one_has_no_voice_overs_and_is_still_read()
+        {
+            // "LDLG" · version 1 · guid · entry 0 · no nodes
+            var v1 = new byte[] { (byte)'L', (byte)'D', (byte)'L', (byte)'G', 1 }.Concat(new byte[16]).Concat(new byte[] { 0, 0 }).ToArray();
+            var graph = DialogueGraphReader.Read(v1);
+            Assert.AreEqual(-1, graph.Entry);
+            Assert.IsFalse(graph.HasAudio);
         }
 
         [Test]
@@ -124,9 +156,9 @@ namespace Loreman.Dialogues.Tests
             Assert.Throws<DialogueFormatException>(() => DialogueGraphReader.Read(wrongMagic));
 
             var newer = (byte[])bytes.Clone();
-            newer[4] = 2;
+            newer[4] = 3;
             var e = Assert.Throws<DialogueFormatException>(() => DialogueGraphReader.Read(newer));
-            StringAssert.Contains("version 2", e.Message);
+            StringAssert.Contains("version 3", e.Message);
         }
 
         [Test]

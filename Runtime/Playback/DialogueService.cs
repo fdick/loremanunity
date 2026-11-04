@@ -19,16 +19,19 @@ namespace Loreman.Dialogues
     {
         private readonly DialogueLibrary _library;
         private readonly IDialogueTextSource _texts;
+        private readonly IDialogueAudioSource _audio;
         private bool _initialized;
 
-        public DialogueService(IAssetLoader loader, IDialogueTextSource texts)
+        /// <param name="audio">Where the voice-overs come from (null: the dialogues are played without voice).</param>
+        public DialogueService(IAssetLoader loader, IDialogueTextSource texts, IDialogueAudioSource audio = null)
         {
             _library = new DialogueLibrary(loader ?? throw new ArgumentNullException(nameof(loader)));
             _texts = texts ?? throw new ArgumentNullException(nameof(texts));
+            _audio = audio ?? new NullAudioSource();
         }
 
-        /// <summary>A service that loads with Addressables and reads texts from Unity Localization.</summary>
-        public static DialogueService CreateDefault() => new DialogueService(new AddressablesAssetLoader(), new LocalizationTextSource());
+        /// <summary>A service that loads with Addressables and reads texts and voice-overs from Unity Localization.</summary>
+        public static DialogueService CreateDefault() => new DialogueService(new AddressablesAssetLoader(), new LocalizationTextSource(), new LocalizationAudioSource());
 
         public bool IsInitialized => _initialized;
 
@@ -51,17 +54,29 @@ namespace Loreman.Dialogues
         public async Task<DialogueConversation> StartAsync(Guid dialogueId, CancellationToken cancellationToken = default)
         {
             if (!_initialized) throw new InvalidOperationException("Loreman: await InitializeAsync before starting a dialogue.");
+            var (lease, audioPrepared) = await AcquireAsync(dialogueId, cancellationToken);
+            return new DialogueConversation(lease, _library.Catalog, _texts, _audio, audioPrepared);
+        }
+
+        /// <summary>Loads the graph and gets the texts (and the voice-overs, when the dialogue has any) ready. On a failure nothing stays held.</summary>
+        private async Task<(DialogueLease Lease, bool AudioPrepared)> AcquireAsync(Guid dialogueId, CancellationToken cancellationToken)
+        {
             var lease = await _library.AcquireAsync(dialogueId, cancellationToken);
+            var textsPrepared = false;
             try
             {
                 await _texts.PrepareAsync(dialogueId, cancellationToken);
+                textsPrepared = true;
+                if (!lease.Graph.HasAudio) return (lease, false);
+                await _audio.PrepareAsync(dialogueId, cancellationToken);
+                return (lease, true);
             }
             catch
             {
+                if (textsPrepared) _texts.Release(dialogueId);
                 lease.Dispose();
                 throw;
             }
-            return new DialogueConversation(lease, _library.Catalog, _texts);
         }
 
         /// <summary>
@@ -71,21 +86,13 @@ namespace Loreman.Dialogues
         public async Task<IDisposable> PreloadAsync(Guid dialogueId, CancellationToken cancellationToken = default)
         {
             if (!_initialized) throw new InvalidOperationException("Loreman: await InitializeAsync before preloading a dialogue.");
-            var lease = await _library.AcquireAsync(dialogueId, cancellationToken);
-            try
-            {
-                await _texts.PrepareAsync(dialogueId, cancellationToken);
-            }
-            catch
-            {
-                lease.Dispose();
-                throw;
-            }
-            return new Preload(lease, _texts);
+            var (lease, audioPrepared) = await AcquireAsync(dialogueId, cancellationToken);
+            return new Preload(lease, _texts, audioPrepared ? _audio : null);
         }
 
         public void Dispose()
         {
+            _audio.Dispose();
             _texts.Dispose();
             _library.Dispose();
         }
@@ -94,18 +101,21 @@ namespace Loreman.Dialogues
         {
             private readonly DialogueLease _lease;
             private readonly IDialogueTextSource _texts;
+            private readonly IDialogueAudioSource _audio; // null when the dialogue has no voice-overs
             private bool _disposed;
 
-            public Preload(DialogueLease lease, IDialogueTextSource texts)
+            public Preload(DialogueLease lease, IDialogueTextSource texts, IDialogueAudioSource audio)
             {
                 _lease = lease;
                 _texts = texts;
+                _audio = audio;
             }
 
             public void Dispose()
             {
                 if (_disposed) return;
                 _disposed = true;
+                _audio?.Release(_lease.Id);
                 _texts.Release(_lease.Id);
                 _lease.Dispose();
             }

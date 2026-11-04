@@ -10,7 +10,8 @@ namespace Loreman.Dialogues
     /// </summary>
     public static class DialogueGraphReader
     {
-        public const byte SupportedVersion = 1;
+        /// <summary>The newest version of the graph this reader knows. Version 1 has no voice-overs; they read as "none".</summary>
+        public const byte SupportedVersion = 2;
 
         private static readonly byte[] Magic = { (byte)'L', (byte)'D', (byte)'L', (byte)'G' };
 
@@ -40,8 +41,8 @@ namespace Loreman.Dialogues
         {
             if (!BinaryFormat.ReadMagic(r, Magic)) throw new DialogueFormatException("This is not the data of a dialogue.");
             var version = r.ReadByte();
-            if (version != SupportedVersion)
-                throw new DialogueFormatException($"The dialogue data is of version {version}; this package reads version {SupportedVersion}. Update the package or build the project again.");
+            if (version < 1 || version > SupportedVersion)
+                throw new DialogueFormatException($"The dialogue data is of version {version}; this package reads versions 1 to {SupportedVersion}. Update the package or build the project again.");
 
             var id = BinaryFormat.ReadGuid(r);
             var entryRef = BinaryFormat.ReadVarInt(r);
@@ -50,23 +51,24 @@ namespace Loreman.Dialogues
             if (entryRef < 0 || entryRef > count) throw new DialogueFormatException("The start of the dialogue points at a node that is not there.");
 
             var nodes = new DialogueNode[count];
-            for (var i = 0; i < count; i++) nodes[i] = ReadNode(r, i, count);
+            for (var i = 0; i < count; i++) nodes[i] = ReadNode(r, i, count, version);
             return new DialogueGraph(id, entryRef - 1, nodes);
         }
 
-        private static DialogueNode ReadNode(BinaryReader r, int index, int count)
+        private static DialogueNode ReadNode(BinaryReader r, int index, int count, byte version)
         {
             var kind = r.ReadByte();
             var id = BinaryFormat.ReadGuid(r);
             var speaker = Ref(r, int.MaxValue) ;
             var text = new TextKey(r.ReadInt64());
+            var audio = version >= 2 ? new TextKey(r.ReadInt64()) : TextKey.None;
             var note = r.ReadString();
 
             if (kind == (byte)DialogueNodeKind.Line)
             {
                 var next = Ref(r, count);
                 var label = new TextKey(r.ReadInt64());
-                return DialogueNode.CreateLine(index, id, speaker, text, note, next, label);
+                return DialogueNode.CreateLine(index, id, speaker, text, note, next, label, audio);
             }
             if (kind != (byte)DialogueNodeKind.Choice) throw new DialogueFormatException($"A node has an unknown kind ({kind}).");
 
@@ -78,11 +80,12 @@ namespace Loreman.Dialogues
             {
                 var optionId = BinaryFormat.ReadGuid(r);
                 var optionText = new TextKey(r.ReadInt64());
+                var optionAudio = version >= 2 ? new TextKey(r.ReadInt64()) : TextKey.None;
                 var next = Ref(r, count);
                 var label = new TextKey(r.ReadInt64());
-                options[o] = new DialogueOption(optionId, optionText, next, label);
+                options[o] = new DialogueOption(optionId, optionText, next, label, optionAudio);
             }
-            return DialogueNode.CreateChoice(index, id, speaker, text, note, answerSpeaker, options);
+            return DialogueNode.CreateChoice(index, id, speaker, text, note, answerSpeaker, options, audio);
         }
 
         /// <summary>Reads a reference (an index plus one) and gives the index, -1 for 0. A node reference must be inside the graph.</summary>

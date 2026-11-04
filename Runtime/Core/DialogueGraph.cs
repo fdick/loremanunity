@@ -15,12 +15,13 @@ namespace Loreman.Dialogues
     /// <summary>One answer of a choice.</summary>
     public sealed class DialogueOption
     {
-        public DialogueOption(Guid id, TextKey text, int next, TextKey label)
+        public DialogueOption(Guid id, TextKey text, int next, TextKey label, TextKey audio = default)
         {
             Id = id;
             Text = text;
             Next = next;
             Label = label;
+            Audio = audio;
         }
 
         public Guid Id { get; }
@@ -33,6 +34,11 @@ namespace Loreman.Dialogues
 
         /// <summary>The words on the arrow that leaves the answer, or <see cref="TextKey.None"/>.</summary>
         public TextKey Label { get; }
+
+        /// <summary>Where the voice-over of the answer is (the key in the audio table), or <see cref="TextKey.None"/> when it has none.</summary>
+        public TextKey Audio { get; }
+
+        public bool HasAudio => !Audio.IsNone;
     }
 
     /// <summary>A line or a choice of a dialogue. Nodes are read-only: a graph is made once, when it is loaded.</summary>
@@ -41,8 +47,10 @@ namespace Loreman.Dialogues
         private static readonly IReadOnlyList<DialogueOption> NoOptions = Array.Empty<DialogueOption>();
 
         private DialogueNode(
-            int index, DialogueNodeKind kind, Guid id, int speaker, TextKey text, string note, int next, TextKey nextLabel, int answerSpeaker, IReadOnlyList<DialogueOption> options)
+            int index, DialogueNodeKind kind, Guid id, int speaker, TextKey text, string note, int next, TextKey nextLabel, int answerSpeaker, IReadOnlyList<DialogueOption> options,
+            TextKey audio)
         {
+            Audio = audio;
             Index = index;
             Kind = kind;
             Id = id;
@@ -56,12 +64,12 @@ namespace Loreman.Dialogues
         }
 
         /// <summary>A line. <paramref name="next"/> is the index of the node after it, -1 when the dialogue ends here.</summary>
-        public static DialogueNode CreateLine(int index, Guid id, int speaker, TextKey text, string note, int next, TextKey nextLabel) =>
-            new DialogueNode(index, DialogueNodeKind.Line, id, speaker, text, note, next, nextLabel, -1, null);
+        public static DialogueNode CreateLine(int index, Guid id, int speaker, TextKey text, string note, int next, TextKey nextLabel, TextKey audio = default) =>
+            new DialogueNode(index, DialogueNodeKind.Line, id, speaker, text, note, next, nextLabel, -1, null, audio);
 
         /// <summary>A choice: <paramref name="text"/> is the question, the options are the answers.</summary>
-        public static DialogueNode CreateChoice(int index, Guid id, int speaker, TextKey text, string note, int answerSpeaker, IReadOnlyList<DialogueOption> options) =>
-            new DialogueNode(index, DialogueNodeKind.Choice, id, speaker, text, note, -1, TextKey.None, answerSpeaker, options);
+        public static DialogueNode CreateChoice(int index, Guid id, int speaker, TextKey text, string note, int answerSpeaker, IReadOnlyList<DialogueOption> options, TextKey audio = default) =>
+            new DialogueNode(index, DialogueNodeKind.Choice, id, speaker, text, note, -1, TextKey.None, answerSpeaker, options, audio);
 
         /// <summary>The place of the node in <see cref="DialogueGraph.Nodes"/>.</summary>
         public int Index { get; }
@@ -78,6 +86,11 @@ namespace Loreman.Dialogues
 
         /// <summary>What is said (a line), or the question (a choice).</summary>
         public TextKey Text { get; }
+
+        /// <summary>Where the voice-over of the line (or of the question) is, or <see cref="TextKey.None"/> when it has none in any language.</summary>
+        public TextKey Audio { get; }
+
+        public bool HasAudio => !Audio.IsNone;
 
         /// <summary>The note of the designer, as it was written in Loreman (conditions, effects…). The package does not read it: the game may.</summary>
         public string Note { get; }
@@ -106,7 +119,13 @@ namespace Loreman.Dialogues
             Entry = entry;
             Nodes = nodes ?? throw new ArgumentNullException(nameof(nodes));
             _byId = new Dictionary<Guid, int>(nodes.Count);
-            for (var i = 0; i < nodes.Count; i++) _byId[nodes[i].Id] = i;
+            for (var i = 0; i < nodes.Count; i++)
+            {
+                _byId[nodes[i].Id] = i;
+                if (nodes[i].HasAudio) HasAudio = true;
+                foreach (var option in nodes[i].Options)
+                    if (option.HasAudio) HasAudio = true;
+            }
         }
 
         public Guid Id { get; }
@@ -115,6 +134,9 @@ namespace Loreman.Dialogues
         public int Entry { get; }
 
         public IReadOnlyList<DialogueNode> Nodes { get; }
+
+        /// <summary>True when some line or answer has a voice-over (in some language). A dialogue without any needs no audio table.</summary>
+        public bool HasAudio { get; }
 
         public bool TryGetNode(Guid nodeId, out DialogueNode node)
         {

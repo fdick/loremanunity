@@ -51,6 +51,8 @@ namespace Loreman.Dialogues.Editor
 
         public string DialoguesFolder => outputFolder.TrimEnd('/') + "/Dialogues";
 
+        public string AudioFolder(Guid dialogueId) => outputFolder.TrimEnd('/') + "/Audio/" + dialogueId.ToString("N");
+
         public string TablesFolder => outputFolder.TrimEnd('/') + "/Localization";
 
         public string LocalesFolder => outputFolder.TrimEnd('/') + "/Locales";

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Loreman.Dialogues
@@ -15,13 +17,17 @@ namespace Loreman.Dialogues
         private readonly DialogueCatalog _catalog;
         private readonly IDialogueTextSource _texts;
         private readonly DialogueLease _lease;
+        private readonly IDialogueAudioSource _audio;
+        private readonly bool _audioPrepared;
         private bool _disposed;
 
-        internal DialogueConversation(DialogueLease lease, DialogueCatalog catalog, IDialogueTextSource texts)
+        internal DialogueConversation(DialogueLease lease, DialogueCatalog catalog, IDialogueTextSource texts, IDialogueAudioSource audio, bool audioPrepared)
         {
             _lease = lease;
             _catalog = catalog;
             _texts = texts;
+            _audio = audio;
+            _audioPrepared = audioPrepared;
             _session = new DialogueSession(lease.Graph);
             _session.NodeEntered += OnNodeEntered;
             _session.Ended += OnEnded;
@@ -58,6 +64,22 @@ namespace Loreman.Dialogues
         /// <summary>Ends the dialogue now.</summary>
         public void Stop() => _session.End();
 
+        /// <summary>
+        /// Loads the voice-over of what is on the screen (<paramref name="optionIndex"/> -1) or of one of its answers, in the current language.
+        /// Null when there is none in this language. The clip is let go when the conversation is disposed. Ask for it when the line appears
+        /// (the first call loads the clip, so it may take a moment), or <see cref="DialogueView.HasAudio"/> first to know whether to ask.
+        /// </summary>
+        public async Task<AudioClip> LoadAudioAsync(DialogueView view, int optionIndex = -1, CancellationToken cancellationToken = default)
+        {
+            if (view == null) throw new ArgumentNullException(nameof(view));
+            if (_disposed || !_audioPrepared || !_lease.Graph.TryGetNode(view.NodeId, out var node)) return null;
+            TextKey key;
+            if (optionIndex < 0) key = node.Audio;
+            else if (optionIndex < node.Options.Count) key = node.Options[optionIndex].Audio;
+            else throw new ArgumentOutOfRangeException(nameof(optionIndex));
+            return key.IsNone ? null : await _audio.LoadClipAsync(_lease.Id, key, cancellationToken);
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -65,6 +87,7 @@ namespace Loreman.Dialogues
             _session.NodeEntered -= OnNodeEntered;
             _session.Ended -= OnEnded;
             _texts.TextsChanged -= OnTextsChanged;
+            if (_audioPrepared) _audio.Release(_lease.Id);
             _texts.Release(_lease.Id);
             _lease.Dispose();
         }
@@ -99,13 +122,13 @@ namespace Loreman.Dialogues
                 for (var i = 0; i < node.Options.Count; i++)
                 {
                     var o = node.Options[i];
-                    list.Add(new OptionView(i, _texts.GetText(id, o.Text), _texts.GetText(id, o.Label)));
+                    list.Add(new OptionView(i, _texts.GetText(id, o.Text), _texts.GetText(id, o.Label), o.HasAudio));
                 }
                 options = list;
             }
             return new DialogueView(
                 node.Id, node.IsChoice, Speaker(node.Speaker), node.IsChoice ? Speaker(node.AnswerSpeaker) : default, _texts.GetText(id, node.Text), node.Note,
-                node.IsChoice ? string.Empty : _texts.GetText(id, node.NextLabel), options);
+                node.IsChoice ? string.Empty : _texts.GetText(id, node.NextLabel), options, node.HasAudio);
         }
 
         private SpeakerView Speaker(int index)

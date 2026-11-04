@@ -65,6 +65,7 @@ namespace Loreman.Dialogues.Tests
             public Dictionary<Guid, string> Existing = new Dictionary<Guid, string>();
             public readonly List<string> Log = new List<string>();
             public readonly Dictionary<Guid, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>>> Texts = new Dictionary<Guid, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>>>();
+            public readonly Dictionary<Guid, IReadOnlyList<SyncAudioFile>> Audio = new Dictionary<Guid, IReadOnlyList<SyncAudioFile>>();
             public IReadOnlyList<string> Languages;
             public bool Ended;
 
@@ -73,7 +74,7 @@ namespace Loreman.Dialogues.Tests
             public void Begin() => Log.Add("begin");
             public void End() { Log.Add("end"); Ended = true; }
             public void EnsureLocales(IReadOnlyList<string> languages) { Languages = languages; Log.Add("locales"); }
-            public void WriteDialogue(ManifestDialogue d, byte[] graph, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) { Log.Add("write " + d.name); Texts[d.Guid] = texts; }
+            public void WriteDialogue(ManifestDialogue d, byte[] graph, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts, IReadOnlyList<SyncAudioFile> audio) { Log.Add("write " + d.name); Texts[d.Guid] = texts; Audio[d.Guid] = audio; }
             public void RemoveDialogue(Guid id) => Log.Add("remove " + id);
             public void WriteSpeakers(IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) => Log.Add("speakers " + string.Join(",", texts.Keys.OrderBy(k => k)));
             public void WriteCatalog(BuildManifest manifest) => Log.Add("catalog");
@@ -94,6 +95,25 @@ namespace Loreman.Dialogues.Tests
                 CollectionAssert.AreEquivalent(new[] { "en", "ru" }, texts.Keys); // there is nothing in German
                 Assert.AreEqual(6, texts["en"].Count);
                 Assert.AreEqual(2, texts["ru"].Count);
+            }
+        }
+
+        [Test]
+        public void The_voice_overs_of_the_dialogue_go_to_the_target_with_a_way_to_read_each_recording()
+        {
+            using (var file = SampleBuild.Open())
+            {
+                var target = new FakeTarget();
+                BuildSynchronizer.Run(file, target);
+                var audio = target.Audio[SampleBuild.Gate(file.Manifest).Guid];
+                Assert.AreEqual(3, audio.Count);
+                CollectionAssert.AreEquivalent(new[] { "en", "ru", "ru" }, audio.Select(a => a.Language));
+                foreach (var a in audio)
+                {
+                    Assert.AreEqual("wav", a.Extension);
+                    var bytes = a.Read();
+                    Assert.AreEqual("RIFF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4)); // the recording as it was uploaded
+                }
             }
         }
 
@@ -158,7 +178,7 @@ namespace Loreman.Dialogues.Tests
             public void Begin() { }
             public void End() => Ended = true;
             public void EnsureLocales(IReadOnlyList<string> languages) => throw new InvalidOperationException("no locale");
-            public void WriteDialogue(ManifestDialogue d, byte[] graph, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) { }
+            public void WriteDialogue(ManifestDialogue d, byte[] graph, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts, IReadOnlyList<SyncAudioFile> audio) { }
             public void RemoveDialogue(Guid id) { }
             public void WriteSpeakers(IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) { }
             public void WriteCatalog(BuildManifest manifest) { }

@@ -6,6 +6,7 @@ using UnityEditor.AddressableAssets;
 using UnityEditor.Localization;
 using UnityEngine;
 using UnityEngine.Localization.Tables;
+using System.Linq;
 using Loreman.Dialogues.Editor;
 
 namespace Loreman.Dialogues.Tests
@@ -111,6 +112,46 @@ namespace Loreman.Dialogues.Tests
                 Assert.AreEqual("Guard", ((StringTable)speakers.GetTable("en")).GetEntry(guard.nameKey).Value);
                 Assert.AreEqual("Стражник", ((StringTable)speakers.GetTable("ru")).GetEntry(guard.nameKey).Value);
             }
+        }
+
+        [Test]
+        public void The_voice_overs_are_audio_clips_in_the_asset_table_of_the_dialogue_one_for_each_language()
+        {
+            Sync();
+            using (var file = SampleBuild.Open())
+            {
+                var id = SampleBuild.Gate(file.Manifest).Guid;
+                var g = SampleBuild.GateGraph(file);
+                var collection = LocalizationEditorSettings.GetAssetTableCollection(LoremanNames.AudioTable(id));
+                Assert.IsNotNull(collection);
+
+                var en = (AssetTable)collection.GetTable("en");
+                var ru = (AssetTable)collection.GetTable("ru");
+                var line = g.Nodes[0].Audio.Id;
+                var answer = g.Nodes[1].Options[0].Audio.Id;
+                Assert.IsNotNull(en.GetEntry(line), "the line has a voice-over in the base language");
+                Assert.IsNotNull(ru.GetEntry(line));
+                Assert.IsNull(en.GetEntry(answer), "the answer was recorded in Russian only");
+                Assert.IsNotNull(ru.GetEntry(answer));
+
+                // the entry points at the imported clip
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(ru.GetEntry(line).Guid));
+                Assert.IsNotNull(clip);
+                Assert.Greater(clip.length, 0f);
+                Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<AudioClip>(_settings.AudioFolder(id) + "/en/" + g.Nodes[0].Id.ToString("N") + ".wav"));
+            }
+        }
+
+        [Test]
+        public void A_dialogue_that_is_gone_takes_its_voice_overs_with_it()
+        {
+            Sync();
+            Guid id;
+            using (var file = SampleBuild.Open()) id = SampleBuild.Gate(file.Manifest).Guid;
+            new UnitySyncTarget(_settings).RemoveDialogue(id);
+            AssetDatabase.Refresh();
+            Assert.IsNull(LocalizationEditorSettings.GetAssetTableCollection(LoremanNames.AudioTable(id)));
+            Assert.IsFalse(AssetDatabase.IsValidFolder(_settings.AudioFolder(id)));
         }
 
         [Test]

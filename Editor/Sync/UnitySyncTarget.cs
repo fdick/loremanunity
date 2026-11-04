@@ -98,7 +98,7 @@ namespace Loreman.Dialogues.Editor
 
         // ── dialogues ──
 
-        public void WriteDialogue(ManifestDialogue dialogue, byte[] graph, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts)
+        public void WriteDialogue(ManifestDialogue dialogue, byte[] graph, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts, IReadOnlyList<SyncAudioFile> audio)
         {
             var id = dialogue.Guid;
             var path = _settings.DialoguePath(id);
@@ -111,6 +111,7 @@ namespace Loreman.Dialogues.Editor
 
             RegisterAddressable(path, LoremanNames.DialogueAddress(id), _settings.packDialoguesSeparately);
             FillCollection(LoremanNames.DialogueTable(id), texts);
+            WriteAudio(id, audio);
         }
 
         public void RemoveDialogue(Guid dialogueId)
@@ -121,14 +122,69 @@ namespace Loreman.Dialogues.Editor
             if (aa != null && !string.IsNullOrEmpty(guid)) aa.RemoveAssetEntry(guid, false);
             AssetDatabase.DeleteAsset(path);
 
-            var collection = LocalizationEditorSettings.GetStringTableCollection(LoremanNames.DialogueTable(dialogueId));
+            DeleteCollection(LocalizationEditorSettings.GetStringTableCollection(LoremanNames.DialogueTable(dialogueId)));
+            RemoveAudio(dialogueId);
+        }
+
+        /// <summary>Deletes a table collection with its tables and its shared data.</summary>
+        private static void DeleteCollection(LocalizationTableCollection collection)
+        {
             if (collection == null) return;
             var paths = new List<string>();
-            foreach (var table in collection.StringTables) paths.Add(AssetDatabase.GetAssetPath(table));
+            foreach (var table in collection.Tables) paths.Add(AssetDatabase.GetAssetPath(table.asset));
             paths.Add(AssetDatabase.GetAssetPath(collection.SharedData));
             paths.Add(AssetDatabase.GetAssetPath(collection));
             foreach (var p in paths)
                 if (!string.IsNullOrEmpty(p)) AssetDatabase.DeleteAsset(p);
+        }
+
+        // ── voice-overs ──
+
+        /// <summary>
+        /// Puts the voice-overs of a dialogue into the project: each recording is a file under the Audio folder (Unity imports it as an AudioClip) and an entry
+        /// of the asset table of the dialogue, in the locale of its language. What the dialogue had before goes first, so a recording that is gone does not stay.
+        /// </summary>
+        private void WriteAudio(Guid dialogueId, IReadOnlyList<SyncAudioFile> audio)
+        {
+            RemoveAudio(dialogueId);
+            if (audio.Count == 0) return;
+
+            var folder = _settings.AudioFolder(dialogueId);
+            LoremanSettings.EnsureFolder(folder);
+            var collection = LocalizationEditorSettings.CreateAssetTableCollection(LoremanNames.AudioTable(dialogueId), _settings.TablesFolder, _locales);
+            var shared = collection.SharedData;
+
+            foreach (var a in audio)
+            {
+                if (!_byLanguage.TryGetValue(a.Language, out var locale))
+                {
+                    Debug.LogWarning("Loreman: a voice-over is in the language \"" + a.Language + "\", which the build does not list. Skipped.");
+                    continue;
+                }
+                var languageFolder = folder + "/" + a.Language;
+                LoremanSettings.EnsureFolder(languageFolder);
+                var assetPath = languageFolder + "/" + a.Id.ToString("N") + "." + a.Extension;
+                System.IO.File.WriteAllBytes(assetPath, a.Read());
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(assetPath);
+                if (clip == null)
+                {
+                    Debug.LogWarning("Loreman: Unity could not read the voice-over \"" + assetPath + "\" as an audio clip.");
+                    continue;
+                }
+                if (!shared.Contains(a.Key)) shared.AddKey("audio:" + a.Id.ToString("D"), a.Key);
+                collection.AddAssetToTable(locale.Identifier, a.Key, clip);
+            }
+            EditorUtility.SetDirty(shared);
+            EditorUtility.SetDirty(collection);
+        }
+
+        private void RemoveAudio(Guid dialogueId)
+        {
+            DeleteCollection(LocalizationEditorSettings.GetAssetTableCollection(LoremanNames.AudioTable(dialogueId)));
+            var folder = _settings.AudioFolder(dialogueId);
+            if (AssetDatabase.IsValidFolder(folder)) AssetDatabase.DeleteAsset(folder);
         }
 
         public void WriteSpeakers(IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) => FillCollection(LoremanNames.SpeakersTable, texts);

@@ -30,11 +30,12 @@ namespace Loreman.Dialogues
     /// <summary>One answer of a choice, ready to be shown.</summary>
     public readonly struct OptionView
     {
-        public OptionView(int index, string text, string label)
+        public OptionView(int index, string text, string label, bool hasAudio = false)
         {
             Index = index;
             Text = text;
             Label = label;
+            HasAudio = hasAudio;
         }
 
         /// <summary>The number to give to <see cref="DialogueConversation.Choose"/>.</summary>
@@ -44,6 +45,9 @@ namespace Loreman.Dialogues
 
         /// <summary>The words on the arrow that leaves the answer (empty when there are none).</summary>
         public string Label { get; }
+
+        /// <summary>The answer has a voice-over (load it with <see cref="DialogueConversation.LoadAudioAsync"/>; it may still be missing in the current language).</summary>
+        public bool HasAudio { get; }
     }
 
     /// <summary>What the screen shows at one moment of a dialogue: a line, or a question with its answers. Texts are in the current language.</summary>
@@ -52,8 +56,10 @@ namespace Loreman.Dialogues
         private static readonly IReadOnlyList<OptionView> NoOptions = Array.Empty<OptionView>();
 
         public DialogueView(
-            Guid nodeId, bool isChoice, SpeakerView speaker, SpeakerView answerSpeaker, string text, string note, string arrowLabel, IReadOnlyList<OptionView> options)
+            Guid nodeId, bool isChoice, SpeakerView speaker, SpeakerView answerSpeaker, string text, string note, string arrowLabel, IReadOnlyList<OptionView> options,
+            bool hasAudio = false)
         {
+            HasAudio = hasAudio;
             NodeId = nodeId;
             IsChoice = isChoice;
             Speaker = speaker;
@@ -74,6 +80,9 @@ namespace Loreman.Dialogues
 
         /// <summary>Who says the answers of a choice.</summary>
         public SpeakerView AnswerSpeaker { get; }
+
+        /// <summary>The line (or the question) has a voice-over. Load it with <see cref="DialogueConversation.LoadAudioAsync"/>.</summary>
+        public bool HasAudio { get; }
 
         /// <summary>The line, or the question.</summary>
         public string Text { get; }
