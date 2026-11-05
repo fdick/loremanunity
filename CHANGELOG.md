@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- **Timeline sample showed magenta objects in URP/HDRP projects** (the primitives carried the Built-in pipeline's material). The sample now paints its objects at run time with the default material of the render pipeline in use, so it looks right in Built-in, URP and HDRP.
+
 ## 0.6.0
 
 - **Unity Timeline integration.** A *Loreman/Dialogue Track* takes *Dialogue Clips*: when a clip starts, the `DialoguePlayer` bound to the track plays the dialogue and the timeline waits there until it is over (or goes on and stops the dialogue at the end of the clip). The dialogue is picked from the searchable list and the clip shows its name. Optional: the assembly exists only where `com.unity.timeline` 1.6 or newer is installed.

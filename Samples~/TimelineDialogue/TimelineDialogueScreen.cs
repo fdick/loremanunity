@@ -3,6 +3,7 @@ using Loreman.Dialogues;
 using UnityEngine;
 using UnityEngine.Localization.Settings;
 using UnityEngine.Playables;
+using UnityEngine.Rendering;
 
 namespace Loreman.Dialogues.Samples.TimelineExample
 {
@@ -16,8 +17,27 @@ namespace Loreman.Dialogues.Samples.TimelineExample
         [SerializeField] private DialoguePlayer player;
         [SerializeField] private PlayableDirector director;
 
+        [Tooltip("The things of the scene that get a colour at the start (the colours below, one for each).")]
+        [SerializeField] private Renderer[] paintedRenderers;
+        [SerializeField] private Color[] paintColors;
+
         private DialogueView _view;
         private string _error;
+
+        // Primitives come with the Built-in pipeline's material, which renders magenta in a URP or HDRP project. The scene is painted with the material of the
+        // pipeline that is in use, so the sample looks right in any of them.
+        private void Awake()
+        {
+            for (var i = 0; i < paintedRenderers.Length && i < paintColors.Length; i++)
+            {
+                var renderer = paintedRenderers[i];
+                if (renderer == null) continue;
+                var pipeline = GraphicsSettings.currentRenderPipeline;
+                var source = pipeline != null && pipeline.defaultMaterial != null ? pipeline.defaultMaterial : renderer.sharedMaterial;
+                if (source == null) continue;
+                renderer.sharedMaterial = new Material(source) { color = paintColors[i] };
+            }
+        }
 
         private void OnEnable()
         {
