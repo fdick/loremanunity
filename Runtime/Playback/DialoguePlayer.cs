@@ -30,6 +30,10 @@ namespace Loreman.Dialogues
         [Tooltip("Start the dialogue as soon as the player is ready.")]
         [SerializeField] private bool playOnStart;
 
+        private DialogueAutoAdvance _autoAdvance;
+        private float _autoSeconds = 3f;
+        private float _shownFor;
+        private int _voiceLoading;
         private DialogueService _service;
         private bool _ownsService;
         private Task _initialization;
@@ -60,6 +64,25 @@ namespace Loreman.Dialogues
         public DialogueView Current => _talk?.Current;
 
         public DialogueService Service => _service;
+
+        /// <summary>A voice-over is being loaded or is playing. The line it belongs to is not "said" yet.</summary>
+        public bool IsVoiceBusy => _voiceLoading > 0 || (voice != null && voice.isPlaying);
+
+        /// <summary>How the player goes on after a line by itself. Choices always wait for <see cref="Choose"/>.</summary>
+        public DialogueAutoAdvance AutoAdvance => _autoAdvance;
+
+        /// <summary>The time of <see cref="AutoAdvance"/> (the reading time of a line, or the pause after its voice-over).</summary>
+        public float AutoAdvanceSeconds => _autoSeconds;
+
+        /// <summary>
+        /// Makes the player go on after each line by itself (a cutscene): after <paramref name="seconds"/> (<see cref="DialogueAutoAdvance.AfterSeconds"/>) or
+        /// once the voice-over is said, plus <paramref name="seconds"/> (<see cref="DialogueAutoAdvance.AfterVoiceOver"/>). A choice still waits for the player.
+        /// </summary>
+        public void SetAutoAdvance(DialogueAutoAdvance mode, float seconds = 3f)
+        {
+            _autoAdvance = mode;
+            _autoSeconds = Mathf.Max(0f, seconds);
+        }
 
         /// <summary>The dialogues of all the builds in the project (empty until <see cref="Ready"/>).</summary>
         public IReadOnlyList<CatalogDialogue> Dialogues => IsReady ? _service.Dialogues : Array.Empty<CatalogDialogue>();
@@ -179,6 +202,7 @@ namespace Loreman.Dialogues
 
         private void OnPresented(DialogueView view)
         {
+            _shownFor = 0f;
             Presented?.Invoke(view);
             PlayVoice(view);
         }
@@ -212,6 +236,7 @@ namespace Loreman.Dialogues
             if (voice != null) voice.Stop();
             var talk = _talk;
             if (talk == null || !view.HasAudio) return;
+            _voiceLoading++;
             try
             {
                 var clip = await talk.LoadAudioAsync(view, -1, _lifetime.Token);
@@ -225,6 +250,29 @@ namespace Loreman.Dialogues
             {
                 Fail(e);
             }
+            finally
+            {
+                _voiceLoading--;
+            }
+        }
+
+        private void Update() => Tick(Time.unscaledDeltaTime);
+
+        /// <summary>One step of the automatic advance (<see cref="Update"/> calls it; a test can too).</summary>
+        internal void Tick(float deltaTime)
+        {
+            var view = Current;
+            if (_autoAdvance == DialogueAutoAdvance.Manual || view == null || view.IsChoice) return;
+            // a line with a voice-over is not over while the recording is loading or playing: the pause is counted from the end of the voice
+            if (_autoAdvance == DialogueAutoAdvance.AfterVoiceOver && view.HasAudio && IsVoiceBusy)
+            {
+                _shownFor = 0f;
+                return;
+            }
+            _shownFor += deltaTime;
+            if (_shownFor < _autoSeconds) return;
+            _shownFor = 0f;
+            Advance();
         }
 
         private void Fail(Exception e)

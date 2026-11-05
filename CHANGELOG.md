@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- **Unity Timeline integration.** A *Loreman/Dialogue Track* takes *Dialogue Clips*: when a clip starts, the `DialoguePlayer` bound to the track plays the dialogue and the timeline waits there until it is over (or goes on and stops the dialogue at the end of the clip). The dialogue is picked from the searchable list and the clip shows its name. Optional: the assembly exists only where `com.unity.timeline` 1.6 or newer is installed.
+- **Automatic advance** for cutscenes: `DialoguePlayer.SetAutoAdvance(Manual | AfterSeconds | AfterVoiceOver, seconds)`. A choice always waits for the player; with `AfterVoiceOver` a line goes on when its recording has been said.
+- New sample **Timeline Dialogue** (scene, timeline asset, animation clips), played in Play Mode by the tests: the timeline is held while the dialogue runs and goes on after it.
+
 ## 0.5.3
 
 - The package is named **Loreman** in the Package Manager (it was "Loreman Dialogues") and the author is **Ousiron**. Samples are imported to `Assets/Samples/Loreman/<version>/…` now. The package id `com.loreman.unity` and the code namespaces are unchanged.

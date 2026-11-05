@@ -1,0 +1,28 @@
+{
+    "name": "Loreman.Dialogues.Samples.Timeline",
+    "rootNamespace": "Loreman.Dialogues.Samples.TimelineExample",
+    "references": [
+        "Loreman.Dialogues.Core",
+        "Loreman.Dialogues.Runtime",
+        "Loreman.Dialogues.Timeline",
+        "Unity.Localization",
+        "Unity.ResourceManager"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "LOREMAN_TIMELINE"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.timeline",
+            "expression": "1.6.0",
+            "define": "LOREMAN_TIMELINE"
+        }
+    ],
+    "noEngineReferences": false
+}

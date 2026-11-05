@@ -56,7 +56,13 @@ namespace Loreman.Dialogues.Tests
 
         public Task PrepareAsync(Guid dialogueId, CancellationToken cancellationToken) { Prepared++; Calls.Add("prepare"); return Task.CompletedTask; }
         public void Release(Guid dialogueId) { Prepared--; Calls.Add("release"); }
-        public Task<AudioClip> LoadClipAsync(Guid dialogueId, TextKey key, CancellationToken cancellationToken) { Calls.Add("load " + key.Id); return Task.FromResult(Clips.TryGetValue(key.Id, out var c) ? c : null); }
+        public TaskCompletionSource<bool> Gate; // when set, clips wait for it
+        public async Task<AudioClip> LoadClipAsync(Guid dialogueId, TextKey key, CancellationToken cancellationToken)
+        {
+            Calls.Add("load " + key.Id);
+            if (Gate != null) await Gate.Task;
+            return Clips.TryGetValue(key.Id, out var c) ? c : null;
+        }
         public void Dispose() { }
     }
 
@@ -566,6 +572,52 @@ namespace Loreman.Dialogues.Tests
             Run(player.InitializeAsync());
             player.Play(Guid.NewGuid());
             Assert.IsNotNull(failure);
+        }
+
+        // ── automatic advance (cutscenes) ──
+
+        [Test]
+        public void By_default_the_player_waits_for_Advance()
+        {
+            var player = NewPlayer(Service());
+            Run(player.PlayAsync(_id));
+            player.Tick(100f);
+            Assert.AreEqual("Halt!", player.Current.Text);
+        }
+
+        [Test]
+        public void After_seconds_the_player_goes_on_by_itself_but_never_past_a_choice()
+        {
+            var player = NewPlayer(Service());
+            player.SetAutoAdvance(DialogueAutoAdvance.AfterSeconds, 2f);
+            Run(player.PlayAsync(_id));
+            player.Tick(1f);
+            Assert.AreEqual("Halt!", player.Current.Text);
+            player.Tick(1.5f);
+            Assert.IsTrue(player.Current.IsChoice);
+            player.Tick(100f);
+            Assert.IsTrue(player.Current.IsChoice, "a choice waits for the player");
+        }
+
+        [Test]
+        public void After_the_voice_over_the_player_waits_while_the_recording_is_loading()
+        {
+            var player = NewPlayer(Service());
+            player.SetAutoAdvance(DialogueAutoAdvance.AfterVoiceOver, 0.5f);
+            _audio.Gate = new TaskCompletionSource<bool>();
+            Run(player.PlayAsync(_id));
+            Assert.IsTrue(player.IsVoiceBusy);
+            player.Tick(10f);
+            Assert.AreEqual("Halt!", player.Current.Text, "the line is not said yet");
+        }
+
+        [Test]
+        public void Auto_advance_settings_are_kept_and_a_negative_pause_is_zero()
+        {
+            var player = NewPlayer(Service());
+            player.SetAutoAdvance(DialogueAutoAdvance.AfterVoiceOver, -4f);
+            Assert.AreEqual(DialogueAutoAdvance.AfterVoiceOver, player.AutoAdvance);
+            Assert.AreEqual(0f, player.AutoAdvanceSeconds);
         }
 
         [Test]

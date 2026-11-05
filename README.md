@@ -83,6 +83,24 @@ In the inspector, a field of type `DialogueReference` is a button with the name 
 `dialogues.PreloadAsync(id)` loads a dialogue ahead of time and keeps it until the handle is disposed. `view.Note` is the designer's note exactly as typed in
 Loreman (conditions, effects…): the package does not read it, your game may. `view.NodeId` can be saved and passed to `talk.JumpTo(id)` to carry on later.
 
+## Timeline
+
+With the **Timeline** package (`com.unity.timeline` 1.6 or newer, optional: nothing here is compiled without it) a dialogue can be a clip.
+
+1. Add a **Loreman/Dialogue Track** to the timeline and drag the object with a `DialoguePlayer` onto the track.
+2. Right click the track → **Add Dialogue Clip**, put it where the dialogue starts, and pick the dialogue in the inspector (the same searchable list; the clip shows its name).
+3. Play. When the clip starts, the player plays the dialogue and **the timeline waits there until the dialogue is over**; then it goes on. Show the dialogue however you like by listening to the player (`Presented`, `Finished`), as with any other `DialoguePlayer`.
+
+| Clip setting | |
+|---|---|
+| Ending: *Wait For Dialogue* | the timeline stops where the clip starts until the dialogue is over; the length of the clip does not matter |
+| Ending: *Stop At End Of Clip* | the timeline does not wait; the dialogue is stopped when the clip ends (if it is not over by then) |
+| Auto Advance: *Manual* | the player presses Next (`player.Advance()`) |
+| Auto Advance: *After Seconds* | each line goes on by itself after *Seconds* |
+| Auto Advance: *After Voice Over* | each line goes on when its voice-over is said, plus *Seconds*; a line without a voice stays *Seconds* |
+
+A choice always waits for the player. Leaving the clip or stopping the timeline stops the dialogue and lets the timeline go; a dialogue that cannot be played does not freeze it. Nothing happens while the timeline is only previewed in the editor, only in Play Mode. The same auto-advance is available without Timeline: `player.SetAutoAdvance(DialogueAutoAdvance.AfterVoiceOver, 0.5f)`.
+
 ## Size
 
 A `.lorebuild` is a transport file: the voice-overs go into it as they were uploaded to Loreman (an mp3 is already compressed, so zipping does not help), so a project with a few long recordings gives a big file. **The game is smaller:** when the importer imports a recording it sets Unity's audio import settings for speech (*Tools → Loreman → Window → Settings*, section Voice-overs; applied once per recording, and a change you make to a clip's own import settings afterwards is kept):
@@ -104,10 +122,11 @@ Only the dialogues the game plays are loaded, and a clip is loaded when its line
 - **Preload and Resume** — preload a dialogue, save the place in it and resume, read the designer's note of a line.
 - **Canvas Dialogue UI (uGUI)** — a custom dialogue screen on a Canvas (needs `com.unity.ugui`): typed-out lines, answer buttons, language buttons.
 - **UI Toolkit Dialogue UI** — the same screen in UI Toolkit: structure in UXML, look in USS.
+- **Timeline Dialogue** (needs `com.unity.timeline`) — a dialogue clip on a timeline: the hero walks up, the timeline waits while the guard talks, then the gate opens.
 
 The two UI samples show the usual way to make a screen: a `DialoguePlayer` on a GameObject plays the dialogue, and the screen only listens to its events.
 
-Each has a README next to its script. The first two draw with `OnGUI` so that they need no UI package. All four scenes are tested by playing them in Play Mode (clicking their buttons) in a project that has nothing but the package.
+Each has a README next to its script. The first two and the Timeline sample draw with `OnGUI` so that they need no UI package. All five scenes are tested by playing them in Play Mode (clicking their buttons) in a project that has nothing but the package.
 
 ## How it is built
 
@@ -115,6 +134,7 @@ Each has a README next to its script. The first two draw with `OnGUI` so that th
 |---|---|---|
 | `Loreman.Dialogues.Core` | no Unity at all | the binary readers, the graph model, `DialogueSession` (the state machine), `LoremanNames` |
 | `Loreman.Dialogues.Runtime` | Unity, Addressables, Localization | `DialogueLibrary` (loads every catalog; loading, reference counting), `IAssetLoader`/`IDialogueTextSource`/`IDialogueAudioSource` and their Addressables/Localization implementations, `DialogueConversation`, `DialogueService`, `DialogueReference` |
+| `Loreman.Dialogues.Timeline` | Unity, Timeline (only where `com.unity.timeline` ≥ 1.6 is installed) | `DialogueTrack`, `DialogueClip`, and `DialogueClipController` (the rules of a clip, tested with fakes) |
 | `Loreman.Dialogues.Editor` | the editor | `.lorebuild` reader, `SyncPlan`, `BuildSynchronizer` (the rules), `UnitySyncTarget` (the writes, scoped to one project), voice-over import settings, importer, auto-sync, `LoremanCli`, the window (`SettingsValidator`, `LanguageRows`, `BuildListing` decide; `LoremanWindow` draws) |
 
 Everything the game touches in the outside world goes through a small interface (`IAssetLoader`, `IDialogueTextSource`, `IDialogueAudioSource`, `ISyncTarget`), so each part is tested with
