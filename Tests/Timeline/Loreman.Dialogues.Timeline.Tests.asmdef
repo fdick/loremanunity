@@ -7,7 +7,10 @@
         "Loreman.Dialogues.Core",
         "Loreman.Dialogues.Runtime",
         "Loreman.Dialogues.Timeline",
-        "Unity.Timeline"
+        "Unity.Timeline",
+        "Loreman.Dialogues.Editor",
+        "Loreman.Dialogues.Timeline.Editor",
+        "Unity.Timeline.Editor"
     ],
     "includePlatforms": [
         "Editor"

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- **A dialogue clip is as long as its dialogue** when the dialogue goes on by itself. Picking the dialogue or changing *Auto Advance* / *Seconds* sets the length of the clip (and the **Fit Clip To Dialogue** button in the inspector does it on demand). The inspector shows how long the dialogue takes: lines count their time (*After Voice Over*: the longest recording of the line among the languages, plus the pause), a choice counts only its longest answer, a loop is counted once round. The clip gets half a second of slack.
+- `DialogueLengthEstimator` (pure, tested) and `DialogueLengthMeasure` (reads the imported dialogue and its audio tables) are public, in case a game wants the length of a dialogue.
+
 ## 0.6.1
 
 - **Timeline sample showed magenta objects in URP/HDRP projects** (the primitives carried the Built-in pipeline's material). The sample now paints its objects at run time with the default material of the render pipeline in use, so it looks right in Built-in, URP and HDRP.

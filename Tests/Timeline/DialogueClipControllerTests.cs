@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Timeline;
+using Loreman.Dialogues.Timeline.Editor;
 
 namespace Loreman.Dialogues.Timeline.Tests
 {
@@ -149,6 +150,36 @@ namespace Loreman.Dialogues.Timeline.Tests
             clip.Begin(); // scrubbed back, or looped
             Assert.AreEqual(2, cue.Played.Count);
             Assert.IsTrue(hold.IsHeld);
+        }
+
+        // ── fitting the length of a clip to its dialogue ──
+
+        [Test]
+        public void A_clip_whose_dialogue_waits_for_Next_is_not_fitted_and_remembers_it_was_looked_at()
+        {
+            var timeline = ScriptableObject.CreateInstance<TimelineAsset>();
+            try
+            {
+                var track = timeline.CreateTrack<DialogueTrack>(null, "Dialogue");
+                var clip = track.CreateClip<DialogueClip>();
+                clip.duration = 7d;
+                var asset = (DialogueClip)clip.asset;
+                DialogueClipFit.FitWhenChanged(clip);
+                Assert.AreEqual(7d, clip.duration, "nothing to fit: the length the author gave stays");
+                Assert.IsFalse(DialogueClipFit.Fit(clip));
+                Assert.IsFalse(DialogueClipFit.Measure(asset).HasValue);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(timeline);
+            }
+        }
+
+        [Test]
+        public void The_fitted_length_is_the_dialogue_plus_a_little_slack_and_never_zero()
+        {
+            Assert.AreEqual(10d + DialogueClipFit.Slack, DialogueClipFit.FittedDuration(new DialogueLength(true, 10d, 3, false, false)), 1e-9);
+            Assert.Greater(DialogueClipFit.FittedDuration(new DialogueLength(true, 0d, 0, false, false)), 0d);
         }
 
         // ── the assets ──

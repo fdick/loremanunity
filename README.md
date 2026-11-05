@@ -99,6 +99,8 @@ With the **Timeline** package (`com.unity.timeline` 1.6 or newer, optional: noth
 | Auto Advance: *After Seconds* | each line goes on by itself after *Seconds* |
 | Auto Advance: *After Voice Over* | each line goes on when its voice-over is said, plus *Seconds*; a line without a voice stays *Seconds* |
 
+**Clip length.** A dialogue that goes on by itself (*After Seconds* / *After Voice Over*) has a length, so the clip is **made that long** when you pick the dialogue or change the pace (and the **Fit Clip To Dialogue** button in the clip's inspector does it again after you stretched it by hand). The inspector says how long the dialogue takes: every line counts its *Seconds* (*After Voice Over*: its recording plus *Seconds*; with several languages, the longest recording of each line), a choice counts only its longest answer (the time the player thinks is not counted), and the clip is half a second longer than that, because loading a recording is not counted. With *Stop At End Of Clip* this makes the dialogue and the timeline end together while the other tracks keep moving. A dialogue the player goes through with Next has no known length: the clip keeps the length you gave it.
+
 A choice always waits for the player. Leaving the clip or stopping the timeline stops the dialogue and lets the timeline go; a dialogue that cannot be played does not freeze it. Nothing happens while the timeline is only previewed in the editor, only in Play Mode. The same auto-advance is available without Timeline: `player.SetAutoAdvance(DialogueAutoAdvance.AfterVoiceOver, 0.5f)`.
 
 ## Size

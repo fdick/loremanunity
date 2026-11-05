@@ -27,6 +27,9 @@ namespace Loreman.Dialogues.Timeline
         [Tooltip("After Seconds: how long each line stays. After Voice Over: the pause after the voice (and how long a line without a voice stays).")]
         public float seconds = 3f;
 
+        /// <summary>Editor only: what the length of the clip was last fitted for, so it is fitted again only when the dialogue or its pace changes.</summary>
+        [HideInInspector] public string lengthFittedFor;
+
         public ClipCaps clipCaps => ClipCaps.None;
 
         /// <summary>The length a new clip gets. With Wait For Dialogue the length does not matter.</summary>

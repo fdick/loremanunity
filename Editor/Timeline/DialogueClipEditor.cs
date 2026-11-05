@@ -20,7 +20,11 @@ namespace Loreman.Dialogues.Timeline.Editor
 
         public override void OnCreate(TimelineClip clip, TrackAsset track, TimelineClip clonedFrom) => Rename(clip);
 
-        public override void OnClipChanged(TimelineClip clip) => Rename(clip);
+        public override void OnClipChanged(TimelineClip clip)
+        {
+            Rename(clip);
+            DialogueClipFit.FitWhenChanged(clip); // a dialogue that goes on by itself has a length: the clip is made that long
+        }
 
         private static void Rename(TimelineClip clip)
         {
