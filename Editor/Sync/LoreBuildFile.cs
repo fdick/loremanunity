@@ -32,6 +32,10 @@ namespace Loreman.Dialogues.Editor
 
         public static string SpeakerTextsPath(string language) => "texts/" + language + "/speakers.bin";
 
+        public const string ItemsPath = "items/items.bin";
+
+        public static string ItemTextsPath(string language) => "texts/" + language + "/items.bin";
+
         public static LoreBuildFile Open(string path)
         {
             // FileShare.ReadWrite: Loreman or the browser may still be finishing the file

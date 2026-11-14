@@ -35,6 +35,21 @@ namespace Loreman.Dialogues.Tests
 
         public static LoreBuildFile OpenOther() => LoreBuildFile.Open(OtherPath);
 
+        /// <summary>
+        /// A build with items only (Tests/Fixtures/items.lorebuild): Weapons/Swords/Sword (Damage 15 pt, Weight 2.5 kg, a text parameter Lore, a picture), Potion (Heal -30 hp, Damage 0 pt, the same picture,
+        /// no description), Letter (a webp picture that is left out). English (base) and Russian (the name of the Sword and its Lore).
+        /// </summary>
+        public static string ItemsPath
+        {
+            get
+            {
+                var info = PackageInfo.FindForAssembly(typeof(SampleBuild).Assembly);
+                return System.IO.Path.Combine(info.resolvedPath, "Tests", "Fixtures", "items.lorebuild");
+            }
+        }
+
+        public static LoreBuildFile OpenItems() => LoreBuildFile.Open(ItemsPath);
+
         public static byte[] Bytes() => File.ReadAllBytes(Path);
 
         public static ManifestDialogue Gate(BuildManifest manifest) => manifest.dialogues.Single(d => d.name == "Gate");

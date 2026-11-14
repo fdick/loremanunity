@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0
+
+- **Items.** The `.lorebuild` of Loreman now carries the items of the project (names, descriptions, number and text parameters, folders, pictures), and the package turns them into a ready system:
+  - **Import:** one `ItemCatalog` asset for each Loreman project (all items in one small Addressable), one string table for their words (a language each, the base language fills what is not translated), and the pictures as sprites (Addressables, one bundle, identical pictures are one file). Items are remade only when their code changed; a build without items removes the items of an older one.
+  - **`ItemDatabase`** (`await LoremanItems.GetAsync()`): every item at hand, by id, by `ItemReference`, by name, by folder (`InFolder`) or by search (`Search`); `ItemDefinition` has `Name`, `Description`, `Folder`, `GetStat("Damage")`, `Stats`, `GetField("Lore")`, `LoadIconAsync()` and follows the language of the player.
+  - **`ItemReference`**: a field of a component with a picker that has a search box and shows the pictures. The window lists the items too.
+  - **`Inventory`** (no Unity inside) and **`InventoryComponent`**: slots, stacks, `Add` / `Remove` / `Move` / `Split` / `Sort` / `TransferTo`, `TryAdd` / `TryRemove` (all or nothing), events, JSON save and load that survives items deleted in Loreman. A number parameter called **Max Stack** sets how many fit in a slot.
+  - Sample **Inventory** (uGUI): slots with pictures, details, moving, adding, sorting, saving, language; played in Play Mode by the tests.
+- The demo build of the samples has seven items now (the same project and dialogue ids as before, so a project that has the old demo is synced in place).
+- A build inside a package (the package's own test fixtures) is no longer synced into the project; only the builds in `Assets` are.
+
 ## 0.7.0
 
 - **A dialogue clip is as long as its dialogue** when the dialogue goes on by itself. Picking the dialogue or changing *Auto Advance* / *Seconds* sets the length of the clip (and the **Fit Clip To Dialogue** button in the inspector does it on demand). The inspector shows how long the dialogue takes: lines count their time (*After Voice Over*: the longest recording of the line among the languages, plus the pause), a choice counts only its longest answer, a loop is counted once round. The clip gets half a second of slack.

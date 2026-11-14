@@ -25,6 +25,7 @@ namespace Loreman.Dialogues.Editor
                     reference.languages = m.languages.Select(l => l.code).ToArray();
                     reference.dialogueCount = m.dialogues.Count;
                     reference.speakerCount = m.speakers.Count;
+                    reference.itemCount = m.items != null && m.items.IsPresent ? m.items.count : 0;
                 }
             }
             catch (Exception e)
@@ -53,6 +54,7 @@ namespace Loreman.Dialogues.Editor
             EditorGUILayout.LabelField("Built", r.builtAt);
             EditorGUILayout.LabelField("Dialogues", r.dialogueCount.ToString());
             EditorGUILayout.LabelField("Speakers", r.speakerCount.ToString());
+            EditorGUILayout.LabelField("Items", r.itemCount.ToString());
             EditorGUILayout.LabelField("Languages", string.Join(", ", r.languages) + "  (base: " + r.baseLanguage + ")");
             EditorGUILayout.LabelField("Content", r.contentHash);
             EditorGUILayout.Space();

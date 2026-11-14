@@ -26,7 +26,10 @@ namespace Loreman.Dialogues.Tests
         }
 
         public Task<IReadOnlyList<string>> FindAddressesAsync(string label, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<string>>(label == LoremanNames.CatalogLabel ? Assets.Keys.Where(k => k.StartsWith("loreman/catalog/")).OrderBy(k => k).ToList() : new List<string>());
+            Task.FromResult<IReadOnlyList<string>>(
+                label == LoremanNames.CatalogLabel ? Assets.Keys.Where(k => k.StartsWith("loreman/catalog/")).OrderBy(k => k).ToList()
+                : label == LoremanNames.ItemCatalogLabel ? Assets.Where(p => p.Value is Loreman.Items.ItemCatalog).Select(p => p.Key).OrderBy(k => k).ToList()
+                : new List<string>());
 
         public void Release(Object asset) => Released.Add(asset);
     }

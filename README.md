@@ -83,6 +83,44 @@ In the inspector, a field of type `DialogueReference` is a button with the name 
 `dialogues.PreloadAsync(id)` loads a dialogue ahead of time and keeps it until the handle is disposed. `view.Note` is the designer's note exactly as typed in
 Loreman (conditions, effects…): the package does not read it, your game may. `view.NodeId` can be saved and passed to `talk.JumpTo(id)` to carry on later.
 
+## Items and the inventory
+
+The items of the Loreman project (the Items tool: names, descriptions, pictures, number and text parameters, folders) are in the same `.lorebuild` (the build settings have a switch) and are imported with it.
+Everything below works after the first sync.
+
+```csharp
+var items = await LoremanItems.GetAsync();            // the shared database, loaded the first time
+var sword = items.Find("Iron Sword");                 // by name, in the language of the player (case does not matter)
+sword.Name; sword.Description; sword.Folder.Path;     // "Weapons"
+sword.GetStat("Damage");                              // 12 (a number parameter; "15 pt" is sword.Stats[i].ToString())
+sword.GetField("Lore");                               // a text parameter
+var icon = await sword.LoadIconAsync();               // a Sprite, loaded when asked for
+foreach (var item in items.InFolder("Consumables")) ...
+var found = items.Search("heal pot");                 // for a search box
+```
+
+In the inspector an `ItemReference` field is a button with the picture and the name of the item; a click opens a list with a search box (type, ↑ ↓, Enter), the × clears it.
+
+```csharp
+[SerializeField] private ItemReference key;            // items.Get(key)
+```
+
+**The inventory** is `InventoryComponent` (*Add Component → Loreman → Inventory*): the number of slots (0: no limit), what it starts with, and
+
+```csharp
+bag.Add(potion, 3);                       // returns how many did not fit; bag.Add("Health Potion") works too
+if (bag.Has("Rusty Key")) OpenDoor();
+bag.TryRemove(potion, 1);                 // all or nothing
+bag.Inventory.Move(from, to);             // merges onto the same item, swaps otherwise; Split, Sort, RemoveAt, TransferTo…
+bag.Changed += change => RefreshScreen(); // once for each operation
+PlayerPrefs.SetString("bag", bag.SaveToJson());   // and bag.LoadFromJson(...): items deleted in Loreman since are dropped
+```
+
+The inventory logic itself is the plain C# class `Inventory` (it knows nothing about Unity or about what an item is, only how many fit in a slot: `IStackRules`), so a chest, a shop, an equipment panel or a test uses the same code.
+**How many fit in a slot** is a number parameter of the item called **Max Stack** (*Stack*, *Stack Size* also work; case and spaces do not matter): give the potion `Max Stack 5` in Loreman and 5 fit. An item without it does not stack. Another rule: `items.StackRule = item => ...`.
+
+Words follow the language: when the player changes the Unity Localization language, `item.Name` is in the new one and `items.TextsChanged` is raised. The pictures are Addressables that are loaded when asked for and let go with the database.
+
 ## Timeline
 
 With the **Timeline** package (`com.unity.timeline` 1.6 or newer, optional: nothing here is compiled without it) a dialogue can be a clip.
@@ -124,11 +162,12 @@ Only the dialogues the game plays are loaded, and a clip is loaded when its line
 - **Preload and Resume** — preload a dialogue, save the place in it and resume, read the designer's note of a line.
 - **Canvas Dialogue UI (uGUI)** — a custom dialogue screen on a Canvas (needs `com.unity.ugui`): typed-out lines, answer buttons, language buttons.
 - **UI Toolkit Dialogue UI** — the same screen in UI Toolkit: structure in UXML, look in USS.
+- **Inventory** (needs `com.unity.ugui`) — a ready inventory screen with the items of the demo build: slots with pictures, details, moving, adding, sorting, saving, language.
 - **Timeline Dialogue** (needs `com.unity.timeline`) — a dialogue clip on a timeline: the hero walks up, the timeline waits while the guard talks, then the gate opens.
 
 The two UI samples show the usual way to make a screen: a `DialoguePlayer` on a GameObject plays the dialogue, and the screen only listens to its events.
 
-Each has a README next to its script. The first two and the Timeline sample draw with `OnGUI` so that they need no UI package. All five scenes are tested by playing them in Play Mode (clicking their buttons) in a project that has nothing but the package.
+Each has a README next to its script. The first two and the Timeline sample draw with `OnGUI` so that they need no UI package. All six scenes are tested by playing them in Play Mode (clicking their buttons) in a project that has nothing but the package.
 
 ## How it is built
 
@@ -136,6 +175,7 @@ Each has a README next to its script. The first two and the Timeline sample draw
 |---|---|---|
 | `Loreman.Dialogues.Core` | no Unity at all | the binary readers, the graph model, `DialogueSession` (the state machine), `LoremanNames` |
 | `Loreman.Dialogues.Runtime` | Unity, Addressables, Localization | `DialogueLibrary` (loads every catalog; loading, reference counting), `IAssetLoader`/`IDialogueTextSource`/`IDialogueAudioSource` and their Addressables/Localization implementations, `DialogueConversation`, `DialogueService`, `DialogueReference` |
+| `Loreman.Dialogues.Runtime` — items | Unity, Addressables, Localization | `ItemCatalog`, `ItemDatabase` / `ItemDefinition` / `LoremanItems`, `ItemReference`, `InventoryComponent`; the engine-free part (`ItemsReader`, `Inventory`) is in `Loreman.Dialogues.Core` |
 | `Loreman.Dialogues.Timeline` | Unity, Timeline (only where `com.unity.timeline` ≥ 1.6 is installed) | `DialogueTrack`, `DialogueClip`, and `DialogueClipController` (the rules of a clip, tested with fakes) |
 | `Loreman.Dialogues.Editor` | the editor | `.lorebuild` reader, `SyncPlan`, `BuildSynchronizer` (the rules), `UnitySyncTarget` (the writes, scoped to one project), voice-over import settings, importer, auto-sync, `LoremanCli`, the window (`SettingsValidator`, `LanguageRows`, `BuildListing` decide; `LoremanWindow` draws) |
 

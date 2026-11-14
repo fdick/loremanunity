@@ -34,6 +34,13 @@ namespace Loreman.Dialogues.Editor
         [Tooltip("Make the Unity locales that the build has languages for and the project does not. Turn it off to fail instead.")]
         public bool createMissingLocales = true;
 
+        [Header("Items")]
+        [Tooltip("The Addressables group of the item catalogs and their pictures (all in one bundle: the items are small and are listed at once).")]
+        public string itemsAddressablesGroup = "Loreman Items";
+
+        [Tooltip("Compress the pictures of the items (smaller, fine for most art). Turn it off for pixel art that must stay crisp. Applied once, when a picture is first imported.")]
+        public bool compressItemIcons = true;
+
         [Header("Voice-overs")]
         [Tooltip("Import the recordings as compact game audio: Vorbis, mono, long ones streamed. Without it Unity keeps its defaults, which are meant for music and sound effects. Applied once, when a recording is first imported; change a clip's own import settings afterwards and they are kept.")]
         public bool optimizeVoiceOvers = true;
@@ -73,6 +80,13 @@ namespace Loreman.Dialogues.Editor
         public string DialoguesFolder => outputFolder.TrimEnd('/') + "/Dialogues";
 
         public string AudioFolder(Guid dialogueId) => outputFolder.TrimEnd('/') + "/Audio/" + dialogueId.ToString("N");
+
+        /// <summary>Everything of the items of one Loreman project: the catalog and the pictures.</summary>
+        public string ItemsFolder(Guid projectId) => outputFolder.TrimEnd('/') + "/Items/" + projectId.ToString("N");
+
+        public string ItemCatalogPath(Guid projectId) => ItemsFolder(projectId) + "/Items.asset";
+
+        public string ItemIconsFolder(Guid projectId) => ItemsFolder(projectId) + "/Icons";
 
         public string TablesFolder => outputFolder.TrimEnd('/') + "/Localization";
 

@@ -7,6 +7,7 @@ namespace Loreman.Dialogues.Editor
     public sealed class LoreBuildReference : ScriptableObject
     {
         public string projectName;
+        public int itemCount;
         public string contentHash;
         public string builtAt;
         public string baseLanguage;

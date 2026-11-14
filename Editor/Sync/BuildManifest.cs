@@ -44,6 +44,21 @@ namespace Loreman.Dialogues.Editor
         public Guid Guid => Guid.TryParse(id, out var guid) ? guid : Guid.Empty;
     }
 
+    /// <summary>The items of a build. JsonUtility cannot tell an absent object from an empty one: a build without items has an empty <see cref="catalog"/>.</summary>
+    [Serializable]
+    public sealed class ManifestItems
+    {
+        public string catalog;
+        public string hash;
+        public int count;
+        public int folders;
+        public int texts;
+        public List<string> icons = new List<string>();
+        public int skippedIcons;
+
+        public bool IsPresent => !string.IsNullOrEmpty(catalog);
+    }
+
     [Serializable]
     public sealed class BuildManifest
     {
@@ -58,5 +73,6 @@ namespace Loreman.Dialogues.Editor
         public List<CatalogSpeaker> speakers = new List<CatalogSpeaker>();
         public List<CatalogGroup> groups = new List<CatalogGroup>();
         public List<ManifestDialogue> dialogues = new List<ManifestDialogue>();
+        public ManifestItems items = new ManifestItems();
     }
 }

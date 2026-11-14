@@ -9,6 +9,7 @@ using UnityEditor.Localization;
 using UnityEngine;
 using UnityEngine.Localization;
 using UnityEngine.Localization.Tables;
+using Loreman.Items;
 
 namespace Loreman.Dialogues.Editor
 {
@@ -263,6 +264,90 @@ namespace Loreman.Dialogues.Editor
             RegisterAddressable(path, LoremanNames.CatalogAddress(_projectId), null, LoremanNames.CatalogLabel);
         }
 
+        // ── items ──
+
+        /// <summary>The code of the items the project has now; empty when there are none, or when something of them is gone (the catalog, its texts or a picture), so that the next sync makes them again.</summary>
+        public string ItemsHash
+        {
+            get
+            {
+                var path = _settings.ItemCatalogPath(_projectId);
+                var catalog = AssetDatabase.LoadAssetAtPath<ItemCatalog>(path);
+                if (catalog == null || !IsRegistered(path, LoremanNames.ItemCatalogAddress(_projectId))) return string.Empty;
+                if (LocalizationEditorSettings.GetStringTableCollection(LoremanNames.ItemsTable(_projectId)) == null) return string.Empty;
+                foreach (var icon in catalog.Data.Icons)
+                {
+                    var iconPath = IconAssetPath(System.IO.Path.GetFileNameWithoutExtension(icon), System.IO.Path.GetExtension(icon).TrimStart('.'));
+                    if (!System.IO.File.Exists(iconPath)) return string.Empty; // (AssetPathToGUID still knows a file deleted a moment ago)
+                }
+                return catalog.ContentHash ?? string.Empty;
+            }
+        }
+
+        private string IconAssetPath(string code, string extension) => _settings.ItemIconsFolder(_projectId) + "/" + code + "." + extension;
+
+        public void WriteItems(BuildManifest manifest, byte[] catalogBytes, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts, IReadOnlyList<SyncIconFile> icons)
+        {
+            LoremanSettings.EnsureFolder(_settings.ItemIconsFolder(_projectId));
+
+            // A picture is named by a code of its bytes: one that is there already is the same picture and is left alone.
+            var wanted = new HashSet<string>();
+            foreach (var icon in icons)
+            {
+                var path = IconAssetPath(icon.Code, icon.Extension);
+                wanted.Add(path);
+                if (!System.IO.File.Exists(path))
+                {
+                    System.IO.File.WriteAllBytes(path, icon.Read());
+                    AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+                }
+                if (AssetDatabase.LoadAssetAtPath<Sprite>(path) == null)
+                {
+                    Debug.LogWarning("Loreman: Unity could not read the picture \"" + path + "\" as a sprite.");
+                    continue;
+                }
+                RegisterAddressableIn(path, LoremanNames.ItemIconAddress(_projectId, icon.Code), true, _settings.itemsAddressablesGroup);
+            }
+            // the pictures an earlier build had and this one has not
+            foreach (var guid in AssetDatabase.FindAssets("", new[] { _settings.ItemIconsFolder(_projectId) }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (AssetDatabase.IsValidFolder(path) || wanted.Contains(path)) continue;
+                AddressableAssetSettingsDefaultObject.GetSettings(false)?.RemoveAssetEntry(guid, false);
+                AssetDatabase.DeleteAsset(path);
+            }
+
+            FillCollection(LoremanNames.ItemsTable(_projectId), texts);
+
+            var catalogPath = _settings.ItemCatalogPath(_projectId);
+            var catalog = AssetDatabase.LoadAssetAtPath<ItemCatalog>(catalogPath);
+            var isNew = catalog == null;
+            if (isNew) catalog = ScriptableObject.CreateInstance<ItemCatalog>();
+            catalog.Populate(_projectId.ToString("D"), manifest.projectName, manifest.items.hash, manifest.baseLanguage, catalogBytes);
+            if (isNew) AssetDatabase.CreateAsset(catalog, catalogPath);
+            else EditorUtility.SetDirty(catalog);
+            RegisterAddressableIn(catalogPath, LoremanNames.ItemCatalogAddress(_projectId), true, _settings.itemsAddressablesGroup, LoremanNames.ItemCatalogLabel);
+        }
+
+        public void RemoveItems()
+        {
+            var aa = AddressableAssetSettingsDefaultObject.GetSettings(false);
+            var catalogPath = _settings.ItemCatalogPath(_projectId);
+            var guid = AssetDatabase.AssetPathToGUID(catalogPath);
+            if (aa != null && !string.IsNullOrEmpty(guid)) aa.RemoveAssetEntry(guid, false);
+            AssetDatabase.DeleteAsset(catalogPath);
+
+            var icons = _settings.ItemIconsFolder(_projectId);
+            if (AssetDatabase.IsValidFolder(icons))
+            {
+                foreach (var iconGuid in AssetDatabase.FindAssets("", new[] { icons })) aa?.RemoveAssetEntry(iconGuid, false);
+                AssetDatabase.DeleteAsset(icons);
+            }
+            DeleteCollection(LocalizationEditorSettings.GetStringTableCollection(LoremanNames.ItemsTable(_projectId)));
+            var folder = _settings.ItemsFolder(_projectId);
+            if (AssetDatabase.IsValidFolder(folder) && AssetDatabase.FindAssets("", new[] { folder }).Length == 0) AssetDatabase.DeleteAsset(folder);
+        }
+
         // ── Unity Localization ──
 
         /// <summary>
@@ -308,11 +393,15 @@ namespace Loreman.Dialogues.Editor
         // ── Addressables ──
 
         /// <param name="packSeparately">Sets the bundle mode of the group (null leaves it as it is).</param>
-        private void RegisterAddressable(string assetPath, string address, bool? packSeparately, params string[] extraLabels)
+        private void RegisterAddressable(string assetPath, string address, bool? packSeparately, params string[] extraLabels) =>
+            RegisterAddressableIn(assetPath, address, packSeparately, _settings.addressablesGroup, extraLabels);
+
+        /// <param name="groupName">The Addressables group (made when it is not there).</param>
+        private void RegisterAddressableIn(string assetPath, string address, bool? packSeparately, string groupName, params string[] extraLabels)
         {
             var aa = AddressableAssetSettingsDefaultObject.GetSettings(true);
-            var group = aa.FindGroup(_settings.addressablesGroup)
-                        ?? aa.CreateGroup(_settings.addressablesGroup, false, false, true, null, typeof(BundledAssetGroupSchema), typeof(ContentUpdateGroupSchema));
+            var group = aa.FindGroup(groupName)
+                        ?? aa.CreateGroup(groupName, false, false, true, null, typeof(BundledAssetGroupSchema), typeof(ContentUpdateGroupSchema));
             var schema = group.GetSchema<BundledAssetGroupSchema>();
             if (schema != null && packSeparately.HasValue)
                 schema.BundleMode = packSeparately.Value ? BundledAssetGroupSchema.BundlePackingMode.PackSeparately : BundledAssetGroupSchema.BundlePackingMode.PackTogether;

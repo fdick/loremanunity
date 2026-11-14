@@ -4,7 +4,7 @@ What a game needs from a Loreman project, packed once by the **Build** button (p
 “Build for the game”). The Unity package `com.loreman.unity` reads it. Server code: `src/Services/Maps/Application/Build/`, endpoint
 `GET /api/build?projectId=…&name=…` (and `/api/build/manifest` for the manifest alone).
 
-The file holds **dialogues**: graphs, texts in every language, speakers and **voice-overs**. Items will join the same file as another part.
+The file holds **dialogues** (graphs, texts in every language, speakers, **voice-overs**) and the **items** of the project (names, descriptions, numbers, text parameters, pictures, folders).
 
 ## Principles
 
@@ -23,6 +23,9 @@ manifest.json                      what is inside (JSON, read first)
 dialogues/{id}.bin                 the graph of one dialogue (id: 32 hex digits, no dashes)
 texts/{language}/{id}.bin          the texts of one dialogue in one language (only when it has any)
 texts/{language}/speakers.bin      the names and descriptions of the speakers in one language
+items/items.bin                    the catalog of the items: folders, items, number parameters (only when the project has items)
+items/icons/{hash}.{png|jpg}       the pictures of the items (identical pictures are one file)
+texts/{language}/items.bin         the names, descriptions and text parameters of all the items in one language
 audio/{language}/{dialogueId}/{id}.{ext}   the voice-over of a line or an answer in one language (id: 32 hex digits; ext: mp3, wav, ogg, m4a)
 ```
 
@@ -38,6 +41,7 @@ camelCase, indented.
 | `baseLanguage`, `languages[]` | `{code, total, translated, stale}` for the base language and every target language. `stale` = translated from an original that has changed since |
 | `speakers[]` | `{id, color, nameKey, noteKey}`; the speakers who talk in the build, sorted by id. Nodes refer to them by index. `noteKey` 0 = no description |
 | `groups[]` | `{id, name}` of the dialogue groups |
+| `items` | absent when the project has no items (or the build leaves them out). `{catalog, hash, count, folders, texts, icons[], skippedIcons}`: `hash` covers the catalog, all the item texts and all the pictures; `icons[]` the paths of the pictures; `skippedIcons` pictures that are not in the file because Unity cannot import their format (webp; the web client only makes png and jpeg) |
 | `dialogues[]` | `{id, name, groupId?, graph, hash, nodes, texts, audio[]}`; `hash` covers the graph, all its tables and all its voice-overs (a recording by its path, size and the time it was uploaded: the file is streamed, so the bytes are not read for the hash). `audio[]` is `{id, key, language, path}`: `id` the line or answer, `key` the key id of its voice-over (`audio:{guid}`, the number the graph holds in its `audio` field) |
 
 Language codes are Loreman's (`en`, `pt-br`); the Unity importer turns them into locale codes (`pt-BR`).
@@ -67,7 +71,9 @@ Nodes are in reading order (breadth first from Start); `entry` is where Start le
 ### Voice-overs
 
 A voice-over belongs to a line or to an answer and to a language; the one recorded for the language of the project is written under that language's code. A recording is put into
-the file **as it was uploaded** (stored, not compressed again). A recording is left out if its line is not reachable, its language is not one of the project's, or its format is
+the file **as it was uploaded** (stored, not compressed again), except when the build asks to compress: then a **wav** recording is made into **Ogg Vorbis** (quality 3, channels and
+sample rate as they were) and its path ends in `.ogg` (mp3, ogg and m4a are never re-encoded). A build can also leave the voice-overs out, and take only some of the project's languages (the language of the
+project is always in). A recording is left out if its line is not reachable, its language is not one of the project's, or its format is
 not mp3, wav, ogg or m4a. Two recordings of the same thing in the same language: the last one counts. The game gets a voice-over only in its own language: there is no fallback
 to the base language (a translated line read in the original voice is wrong more often than it helps).
 
@@ -88,3 +94,37 @@ against the same bytes:
 ```bash
 LOREMAN_FIXTURE_DIR=/path/to/fixture dotnet run --project tests/Loreman.Tests -- --treenode-filter "/*/*/LoreBuildTests/*"
 ```
+
+
+### Items
+
+The items are small, and a game wants the name and picture of every one of them at hand (an inventory lists them), so unlike the dialogues they are **not split up**: one catalog, one table of
+texts per language, and the pictures. Each item is the `Item` of the Items tool: a name, a description, a picture, **number parameters** and **text parameters**, in a folder or at the top level.
+
+**`items/items.bin`** (little-endian, `varint` and `string` as in the graph, a *ref* is an index plus one, 0 = nothing):
+
+```
+"LITM" · u8 version=1
+varint statCount   · statCount × ( string name · string unit )       the number parameters in use, each once (“Damage” “pt”); an item refers to one by its index
+varint nameCount   · nameCount × string                              the names of the text parameters in use, each once (“Lore”)
+varint folderCount · folderCount × ( guid id · varint parent(ref) · string name )     a parent comes before its children
+varint iconCount   · iconCount × string path                         the pictures
+varint itemCount   · itemCount × item
+
+item = guid id · varint folder(ref) · i64 name · i64 description · varint icon(ref) · varint statCount · statCount × ( varint stat · number )
+       · varint fieldCount · fieldCount × ( varint nameIndex · i64 text )
+number = u8 0 · zigzag varint        a whole number: 15 is one byte, −30 is one byte
+       | u8 1 · f64                  anything else
+```
+
+Items are sorted by id and folders by tree and name, so the same project gives the same bytes. `i64 name` and `i64 text` are key ids of `texts/{language}/items.bin`
+(`item:{guid}:name`, `item:{guid}:description`, `item:{guid}:field:{name}`; `description` is 0 when the item has none, and a text parameter with no text is left out). The table of a
+language other than the base holds only what is translated: the game falls back to the language of the project, as it does for dialogues.
+
+A **number parameter** is one of the Progression tool, in the group named like the item (“Sword: Damage”). In the file it is its **name and unit** (“Damage”, “pt”), so the sword's and
+the potion's Damage are one entry of `stat`. Names are not translated. The unit and the name are what a game shows next to the number; the name is also how code asks for it.
+
+**Pictures** are the files the web client made (png, or jpeg when a png was too heavy; at most 192 px on the longest side). They are stored as they are in `items/icons/`, under a code of
+their bytes, so two items with the same picture take one file. A webp picture (only an import can make one) is left out and counted in `skippedIcons`.
+
+Size: 2000 items with three small numbers each are about 50 bytes apiece in the catalog; the pictures are the bulk, and the file keeps them once.

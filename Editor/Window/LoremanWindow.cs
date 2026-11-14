@@ -25,6 +25,7 @@ namespace Loreman.Dialogues.Editor
         private VisualElement _issues;
         private VisualElement _languages;
         private VisualElement _dialogues;
+        private VisualElement _items;
         private Label _status;
 
         [MenuItem("Tools/Loreman/Window")]
@@ -75,6 +76,10 @@ namespace Loreman.Dialogues.Editor
             root.Add(Section("Dialogues in the project"));
             _dialogues = new VisualElement();
             root.Add(_dialogues);
+
+            root.Add(Section("Items in the project"));
+            _items = new VisualElement();
+            root.Add(_items);
 
             root.Bind(_settingsObject);
             root.TrackSerializedObjectValue(_settingsObject, _ =>
@@ -143,6 +148,7 @@ namespace Loreman.Dialogues.Editor
             ShowIssues();
             ShowLanguages(builds);
             ShowDialogues(catalogs);
+            ShowItems();
         }
 
         private VisualElement BuildCard(BuildInfo build)
@@ -160,7 +166,7 @@ namespace Loreman.Dialogues.Editor
             }
             else
             {
-                card.Add(new Label($"{build.AssetPath}\nBuilt {build.BuiltAt}\n{build.Dialogues} dialogue(s) · {build.Speakers} speaker(s) · {build.Languages.Count} language(s)")
+                card.Add(new Label($"{build.AssetPath}\nBuilt {build.BuiltAt}\n{build.Dialogues} dialogue(s) · {build.Items} item(s) · {build.Speakers} speaker(s) · {build.Languages.Count} language(s)")
                     { style = { opacity = 0.75f, whiteSpace = WhiteSpace.Normal } });
             }
 
@@ -248,6 +254,52 @@ namespace Loreman.Dialogues.Editor
             _dialogues.Add(search);
             _dialogues.Add(summary);
             _dialogues.Add(list);
+            Show(string.Empty);
+        }
+
+        private void ShowItems()
+        {
+            ItemLocator.Invalidate();
+            _items.Clear();
+            var all = ItemLocator.FindAll();
+            if (all.Count == 0)
+            {
+                _items.Add(new Label("No items synced. Build the project in Loreman with the items included.") { style = { opacity = 0.7f } });
+                return;
+            }
+            var shown = all;
+            var summary = new Label { style = { marginBottom = 2, opacity = 0.75f } };
+            var list = new ListView(shown, 26, () =>
+            {
+                var row = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
+                row.Add(new Image { name = "icon", scaleMode = ScaleMode.ScaleToFit, style = { width = 22, height = 22, marginRight = 6 } });
+                row.Add(new Label { name = "text" });
+                return row;
+            }, (element, i) =>
+            {
+                var item = shown[i];
+                element.Q<Image>("icon").sprite = item.IconPath.Length > 0 ? AssetDatabase.LoadAssetAtPath<Sprite>(item.IconPath) : null;
+                element.Q<Label>("text").text = item.FullName;
+            })
+            {
+                selectionType = SelectionType.None,
+                showBorder = true,
+            };
+
+            void Show(string query)
+            {
+                shown = ItemSearch.Filter(all, query);
+                list.itemsSource = shown;
+                list.style.height = Mathf.Clamp(shown.Count * 26 + 4, 56, 260);
+                list.Rebuild();
+                summary.text = string.IsNullOrWhiteSpace(query) ? $"{all.Count} item(s)" : $"{shown.Count} of {all.Count} item(s)";
+            }
+
+            var search = new ToolbarSearchField { style = { width = Length.Auto(), marginBottom = 4 } };
+            search.RegisterValueChangedCallback(e => Show(e.newValue));
+            _items.Add(search);
+            _items.Add(summary);
+            _items.Add(list);
             Show(string.Empty);
         }
 

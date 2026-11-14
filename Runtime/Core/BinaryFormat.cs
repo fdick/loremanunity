@@ -19,6 +19,19 @@ namespace Loreman.Dialogues
             throw new DialogueFormatException("A number in the data is too long.");
         }
 
+        /// <summary>A 64-bit number in the 7-bit format.</summary>
+        public static ulong ReadVarULong(BinaryReader reader)
+        {
+            ulong result = 0;
+            for (var shift = 0; shift < 70; shift += 7)
+            {
+                var b = reader.ReadByte();
+                result |= (ulong)(b & 0x7F) << shift;
+                if ((b & 0x80) == 0) return result;
+            }
+            throw new DialogueFormatException("A number in the data is too long.");
+        }
+
         public static Guid ReadGuid(BinaryReader reader) => new Guid(reader.ReadBytes(16));
 
         public static bool ReadMagic(BinaryReader reader, byte[] magic)

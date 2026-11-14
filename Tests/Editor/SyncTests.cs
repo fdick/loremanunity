@@ -78,6 +78,20 @@ namespace Loreman.Dialogues.Tests
             public void RemoveDialogue(Guid id) => Log.Add("remove " + id);
             public void WriteSpeakers(IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) => Log.Add("speakers " + string.Join(",", texts.Keys.OrderBy(k => k)));
             public void WriteCatalog(BuildManifest manifest) => Log.Add("catalog");
+
+            public string ItemsHashValue = "";
+            public byte[] ItemsCatalog;
+            public IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> ItemTexts;
+            public IReadOnlyList<SyncIconFile> Icons;
+            public string ItemsHash => ItemsHashValue;
+            public void WriteItems(BuildManifest manifest, byte[] catalog, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts, IReadOnlyList<SyncIconFile> icons)
+            {
+                Log.Add("items " + manifest.items.count);
+                ItemsCatalog = catalog;
+                ItemTexts = texts;
+                Icons = icons;
+            }
+            public void RemoveItems() => Log.Add("remove items");
         }
 
         [Test]
@@ -159,6 +173,70 @@ namespace Loreman.Dialogues.Tests
             }
         }
 
+        // ── items ──
+
+        [Test]
+        public void A_build_with_items_writes_them_with_their_texts_and_pictures_and_a_build_without_leaves_them_alone()
+        {
+            using (var file = SampleBuild.OpenItems())
+            {
+                var target = new FakeTarget();
+                var report = BuildSynchronizer.Run(file, target);
+                Assert.IsTrue(report.ItemsWritten);
+                Assert.AreEqual(3, report.Items);
+                CollectionAssert.Contains(target.Log, "items 3");
+                Assert.Less(target.Log.IndexOf("items 3"), target.Log.IndexOf("catalog"), "the items are in before the catalog says the build is synced");
+                Assert.AreEqual(3, Loreman.Items.ItemsReader.Read(target.ItemsCatalog).Items.Count);
+                CollectionAssert.AreEquivalent(new[] { "en", "ru" }, target.ItemTexts.Keys);
+                Assert.AreEqual(1, target.Icons.Count);
+                Assert.AreEqual("png", target.Icons[0].Extension);
+                Assert.AreEqual(0x89, target.Icons[0].Read()[0]); // a png as the build has it
+            }
+            using (var file = SampleBuild.Open())
+            {
+                var target = new FakeTarget();
+                var report = BuildSynchronizer.Run(file, target);
+                Assert.IsFalse(report.ItemsWritten);
+                Assert.IsFalse(target.Log.Any(l => l.StartsWith("items") || l == "remove items"));
+            }
+        }
+
+        [Test]
+        public void Items_are_written_again_only_when_their_code_changed()
+        {
+            using (var file = SampleBuild.OpenItems())
+            {
+                var same = new FakeTarget { Hash = file.Manifest.contentHash, ItemsHashValue = file.Manifest.items.hash };
+                var report = BuildSynchronizer.Run(file, same);
+                Assert.IsTrue(report.WasUpToDate);
+                Assert.IsEmpty(same.Log);
+
+                var changed = new FakeTarget { Hash = file.Manifest.contentHash, ItemsHashValue = "older" };
+                Assert.IsFalse(BuildSynchronizer.Run(file, changed).WasUpToDate);
+                CollectionAssert.Contains(changed.Log, "items 3");
+
+                var lost = new FakeTarget { Hash = file.Manifest.contentHash, ItemsHashValue = "" }; // the project lost its items (the assets were deleted): they come back
+                Assert.IsFalse(BuildSynchronizer.Run(file, lost).WasUpToDate);
+                CollectionAssert.Contains(lost.Log, "items 3");
+
+                var forced = new FakeTarget { Hash = file.Manifest.contentHash, ItemsHashValue = file.Manifest.items.hash };
+                BuildSynchronizer.Run(file, forced, force: true);
+                CollectionAssert.Contains(forced.Log, "items 3");
+            }
+        }
+
+        [Test]
+        public void A_build_without_items_removes_the_items_an_older_build_left()
+        {
+            using (var file = SampleBuild.Open())
+            {
+                var target = new FakeTarget { Hash = file.Manifest.contentHash, ItemsHashValue = "from an older build" };
+                var report = BuildSynchronizer.Run(file, target);
+                Assert.IsTrue(report.ItemsRemoved);
+                CollectionAssert.Contains(target.Log, "remove items");
+            }
+        }
+
         [Test]
         public void The_target_is_always_told_that_the_sync_is_over()
         {
@@ -182,6 +260,9 @@ namespace Loreman.Dialogues.Tests
             public void RemoveDialogue(Guid id) { }
             public void WriteSpeakers(IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts) { }
             public void WriteCatalog(BuildManifest manifest) { }
+            public string ItemsHash => "";
+            public void WriteItems(BuildManifest manifest, byte[] catalog, IReadOnlyDictionary<string, IReadOnlyList<StringTableEntry>> texts, IReadOnlyList<SyncIconFile> icons) { }
+            public void RemoveItems() { }
         }
     }
 }

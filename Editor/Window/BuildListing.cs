@@ -30,6 +30,8 @@ namespace Loreman.Dialogues.Editor
 
         public int Speakers { get; set; }
 
+        public int Items { get; set; }
+
         /// <summary>Why the file cannot be read (damaged, not a build, a newer version), or null.</summary>
         public string Error { get; set; }
 
@@ -58,6 +60,7 @@ namespace Loreman.Dialogues.Editor
                     info.Languages = m.languages;
                     info.Dialogues = m.dialogues.Count;
                     info.Speakers = m.speakers.Count;
+                    info.Items = m.items != null && m.items.IsPresent ? m.items.count : 0;
                     info.IsSynced = syncedHashes != null && syncedHashes.TryGetValue(projectId, out var hash) && !string.IsNullOrEmpty(hash) && hash == m.contentHash;
                 }
             }

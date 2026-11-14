@@ -83,13 +83,17 @@ namespace Loreman.Dialogues.Editor
     /// <summary>When a .lorebuild is added, replaced or moved in the project, it is synced (after the import is over: assets cannot be made in the middle of it).</summary>
     public sealed class LoreBuildPostprocessor : AssetPostprocessor
     {
+        internal static bool IsProjectBuild(string path) =>
+            path.EndsWith(".lorebuild", StringComparison.OrdinalIgnoreCase) && path.StartsWith("Assets/", StringComparison.Ordinal);
+
         private static void OnPostprocessAllAssets(string[] imported, string[] deleted, string[] moved, string[] movedFrom)
         {
+            // Only the builds of the project (Assets): a build inside a package (the package's own test fixtures) is not the game's.
             var builds = new System.Collections.Generic.List<string>();
             foreach (var path in imported)
-                if (path.EndsWith(".lorebuild", StringComparison.OrdinalIgnoreCase)) builds.Add(path);
+                if (IsProjectBuild(path)) builds.Add(path);
             foreach (var path in moved)
-                if (path.EndsWith(".lorebuild", StringComparison.OrdinalIgnoreCase) && !builds.Contains(path)) builds.Add(path);
+                if (IsProjectBuild(path) && !builds.Contains(path)) builds.Add(path);
             if (builds.Count == 0) return;
 
             EditorApplication.delayCall += () =>
